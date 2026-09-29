@@ -9,7 +9,7 @@
 <title>川上 公一郎｜アルバム</title>
 <style>
 :root{--bg:#fbfaf7;--paper:#fff;--ink:#2d2a26;--mut:#918a80;--line:#ebe6df;--gold:#ad9166;--shadow:0 12px 32px rgba(62,52,40,.08)}
-*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif;background:var(--bg);color:var(--ink)}button{font:inherit}.hidden{display:none!important}body.viewerOpen{overflow:hidden}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif;background:var(--page-background,linear-gradient(180deg,#fff 0%,var(--bg) 100%));color:var(--ink)}button{font:inherit}.hidden{display:none!important}body.viewerOpen{overflow:hidden}
 .page{max-width:780px;margin:auto;padding:calc(env(safe-area-inset-top) + 22px) 18px 96px}.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:34px}.brand{font-size:11px;letter-spacing:.24em;color:var(--gold)}.topActions{display:flex;gap:8px}.pill{border:1px solid var(--line);background:rgba(255,255,255,.9);color:#655d53;padding:8px 12px;border-radius:999px;font-size:12px;text-decoration:none;cursor:pointer}
 .hero{padding:6px 0 34px}.hero h1{margin:0;font-family:"Yu Mincho","Hiragino Mincho ProN",serif;font-size:clamp(40px,10vw,66px);letter-spacing:.08em;font-weight:600}.hero p{margin:14px 0 0;color:var(--mut);font-size:14px;line-height:1.8}.sectionHead{display:flex;justify-content:space-between;align-items:end;margin-bottom:14px}.sectionHead h2{margin:0;font-size:16px}.sectionHead span{font-size:11px;color:var(--mut)}
 .years{display:grid;gap:14px}.yearCard{position:relative;border:0;padding:0;width:100%;text-align:left;border-radius:24px;overflow:hidden;min-height:190px;background:#eee;box-shadow:var(--shadow);cursor:pointer}.yearCard img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.yearCard .fallback{position:absolute;inset:0;background:linear-gradient(145deg,#d8c7b0,#f2e8dc 48%,#b9a58c)}.yearCard:nth-child(2n) .fallback{background:linear-gradient(145deg,#d9e1e4,#b8c4c9 48%,#eee9e2)}.yearCard:nth-child(3n) .fallback{background:linear-gradient(145deg,#ead8d2,#c8aba1 48%,#f3ece5)}.yearShade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(22,20,18,.52),rgba(22,20,18,.05) 74%)}.yearInfo{position:absolute;z-index:2;left:18px;right:18px;bottom:17px;color:#fff}.yearNum{font-family:Georgia,"Times New Roman",serif;font-size:50px;line-height:1}.yearMeta{font-size:11px;margin-top:8px;opacity:.92}.latest{position:absolute;z-index:3;left:16px;top:16px;background:rgba(255,255,255,.88);padding:6px 9px;border-radius:999px;font-size:10px;color:#665c50}.arrow{position:absolute;z-index:3;right:16px;top:16px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.88);display:grid;place-items:center;color:#4c443b;font-size:22px}.empty{padding:50px 20px;border:1px dashed var(--line);border-radius:20px;text-align:center;color:var(--mut);background:#fff}
@@ -23,7 +23,7 @@
 @media(max-width:559px){.nav{display:none}}
 
 /* Saved header appearance and initial-state safety. */
-.hero{background:var(--header,#fff);border-radius:22px;padding:24px 20px;margin-bottom:26px}
+.hero{background:var(--hero-background,transparent);border-radius:0;padding:6px 0 34px;margin-bottom:0}
 .hero h1{font-family:var(--title-font,"Yu Mincho",serif);font-size:clamp(28px,10vw,var(--title-size,66px));overflow-wrap:anywhere;white-space:pre-wrap}
 .hero p{white-space:pre-wrap;overflow-wrap:anywhere}.hero #headerText{color:var(--ink);font-size:16px}
 .brand{overflow-wrap:anywhere}.top{gap:12px}.topActions{flex-shrink:0}.pill,.back{background:var(--paper);color:var(--ink)}
@@ -59,6 +59,6 @@
 
 <section id="viewer" class="viewer" role="dialog" aria-modal="true" aria-label="写真ビューア" aria-hidden="true"><div class="viewerTop"><div id="counter" class="counter"></div><button id="close" class="close" aria-label="写真を閉じる">×</button></div><button id="prev" class="nav prev" aria-label="前の写真">‹</button><button id="next" class="nav next" aria-label="次の写真">›</button><div id="stage" class="stage"><div id="canvas" class="canvas"><img id="big" class="big" alt=""></div></div><div class="viewerHint">左右スワイプで移動 ・ ピンチ / ダブルタップで拡大</div></section>
 <div id="toast" class="toast hidden"></div>
-<script type="module" src="index.js?v=20260930-1"></script>
+<script type="module" src="index.js?v=20260930-2"></script>
 </body>
 </html>

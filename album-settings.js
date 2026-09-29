@@ -31,6 +31,14 @@ export function pageSettings(site) {
 export function applyAppearance(element, settings) {
   const vars = {background:'bg',surface:'paper',text:'ink',muted:'mut',accent:'gold',header:'header'};
   for (const [key, name] of Object.entries(vars)) element.style.setProperty('--' + name, settings.colors[key]);
+  // The approved year-album design uses an ivory gradient and an unboxed title.
+  // Keep explicitly selected custom colors editable without importing the old layout.
+  const ivory = settings.colors.background.toLowerCase() === DEFAULT_COLORS.background;
+  element.style.setProperty('--page-background', ivory
+    ? 'linear-gradient(180deg, #ffffff 0%, #fbfaf7 100%)'
+    : settings.colors.background);
+  element.style.setProperty('--hero-background', settings.colors.header.toLowerCase() === DEFAULT_COLORS.header
+    ? 'transparent' : settings.colors.header);
   element.style.setProperty('--title-font', FONTS[settings.font]);
   element.style.setProperty('--title-size', settings.size + 'px');
 }

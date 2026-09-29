@@ -60,6 +60,27 @@ async function mount(name,state){
 function input(w,selector,value){const node=w.document.querySelector(selector);if(node.type==='checkbox')node.checked=value;else node.value=value;node.dispatchEvent(new w.Event('input',{bubbles:true}));node.dispatchEvent(new w.Event('change',{bubbles:true}))}
 function submit(w){w.document.querySelector('#siteForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}))}
 (async()=>{
+  // Regression: restore the approved palette, then save text/intro without reviving legacy blue.
+  const modernPalette={background:'#fbfaf7',surface:'#ffffff',text:'#2d2a26',muted:'#918a80',accent:'#ad9166',header:'#ffffff'};
+  const restored=fixture(false);Object.assign(restored.site.theme,modernPalette);
+  let preview=await mount('index',restored);
+  await until(()=>preview.doc.querySelectorAll('.yearCard').length===2,'restored palette');
+  assert.equal(preview.doc.documentElement.style.getPropertyValue('--page-background'),'linear-gradient(180deg, #ffffff 0%, #fbfaf7 100%)');
+  assert.equal(preview.doc.documentElement.style.getPropertyValue('--hero-background'),'transparent');
+  assert.equal(preview.w.getComputedStyle(preview.doc.querySelector('.hero')).borderRadius,'0');
+  preview.close();preview=await mount('admin',restored);
+  await until(()=>preview.doc.querySelector('#saveStatus').textContent==='保存済み','restored settings');
+  assert.equal(preview.doc.querySelector('#cBg').value,'#fbfaf7');
+  input(preview.w,'#siteHeaderText','ヘッダー編集を維持');input(preview.w,'#introEnabled',true);submit(preview.w);
+  await until(()=>preview.doc.querySelector('#saveStatus').textContent.includes('保存しました'),'save restored palette');
+  assert.equal(restored.site.theme.background,'#fbfaf7');assert.equal(restored.site.header_text,'ヘッダー編集を維持');
+  assert.equal(restored.site.theme.intro_photos.length,3);
+  // A future deliberate custom color remains editable.
+  input(preview.w,'#cBg','#112233');submit(preview.w);
+  await until(()=>preview.doc.querySelector('#saveStatus').textContent.includes('保存しました'),'custom color');
+  assert.equal(restored.site.theme.background,'#112233');preview.close();
+  console.log('PASS: approved ivory gradient, unboxed title, settings save preserves palette, custom color editing');
+
   let state=fixture(false),release;state.delaySite=new Promise(resolve=>release=resolve);
   let app=await mount('index',state);
   assert(app.doc.querySelector('#intro').classList.contains('hidden'),'intro must be hidden before settings resolve');

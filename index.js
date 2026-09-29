@@ -1,5 +1,5 @@
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.117.2';
-import {introEnabled, pageSettings, applyAppearance, uniqueIntroPhotos} from './album-settings.js?v=20260930-1';
+import {introEnabled, pageSettings, applyAppearance, uniqueIntroPhotos} from './album-settings.js?v=20260930-2';
 const sb=createClient('https://esfgrykcvdctnvdqipbj.supabase.co','sb_publishable_Rwb3qaRXdWZoo05LrbFaDg_29tMI7uI');
 const bucket='photo-album', PAGE=60, $=s=>document.querySelector(s);
 const e={home:$('#homeView'),detail:$('#detailView'),years:$('#years'),yearCount:$('#yearCount'),name:$('#displayName'),back:$('#back'),detailYear:$('#detailYear'),detailYearSmall:$('#detailYearSmall'),detailCount:$('#detailCount'),photos:$('#photos'),more:$('#more'),loadMore:$('#loadMore'),intro:$('#intro'),replay:$('#replay'),viewer:$('#viewer'),counter:$('#counter'),close:$('#close'),prev:$('#prev'),next:$('#next'),stage:$('#stage'),canvas:$('#canvas'),big:$('#big'),toast:$('#toast')};
