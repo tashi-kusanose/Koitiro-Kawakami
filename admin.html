@@ -58,7 +58,9 @@ button:disabled{opacity:.5;cursor:wait}.saveActions{position:sticky;bottom:0;z-i
 <label class="switch"><input id="introEnabled" type="checkbox"><span>公開ページを開いたときにイントロを表示する</span></label>
 <p class="mut">OFFで保存すると、自動再生と「▶ イントロ」ボタンの両方を非表示にします。</p>
 <label>イントロ最後の文字<input id="introFinalText" maxlength="20" placeholder="思い出"></label>
-<div class="introPreview"><strong>イントロに表示する写真</strong><p class="mut">最大3枚。矢印で順序変更、×で選択解除できます。1枚目が最後に大きく表示されます。空き枠は年別アルバムの表紙で補います。</p>
+<label style="margin-top:14px">写真の選び方<select id="introPhotoMode"><option value="fixed">選んだ写真を固定で表示</option><option value="random">毎回ランダムに3枚表示</option></select></label>
+<p id="randomIntroInfo" class="mut hidden">公開中のすべての年の写真から、ページを開くたび・イントロを再生するたびに重複しない3枚を選びます。固定用に選んだ写真は保持されます。</p>
+<div id="fixedIntroPhotos" class="introPreview"><strong>イントロに表示する写真</strong><p class="mut">最大3枚。矢印で順序変更、×で選択解除できます。1枚目が最後に大きく表示されます。空き枠は年別アルバムの表紙で補います。</p>
 <div id="introSelected" class="introSelected"></div><div class="pickerHead"><strong>アップロード済み写真から選択</strong><span id="pickCount" class="mut"></span></div><div id="photoPicker" class="picker"></div><button id="pickerMore" class="outline pickerMore hidden" type="button">さらに表示</button></div>
 </fieldset>
 <label class="switch"><input id="sitePublished" type="checkbox"><span>ページを公開する</span></label>
@@ -74,6 +76,6 @@ button:disabled{opacity:.5;cursor:wait}.saveActions{position:sticky;bottom:0;z-i
 <div id="progress" class="progressWrap hidden"><div class="progressTrack"><div id="progressBar" class="progressBar"></div></div><p id="progressText" class="mut"></p></div><div id="photoGrid" class="photos"></div></section>
 </main></div></section>
 <div id="toast" class="toast hidden"></div>
-<script type="module" src="admin.js?v=20260930-2"></script>
+<script type="module" src="admin.js?v=20260930-3"></script>
 </body>
 </html>

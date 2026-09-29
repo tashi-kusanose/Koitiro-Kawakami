@@ -12,6 +12,24 @@ export function introEnabled(theme) {
   const value = theme?.intro_enabled;
   return value !== false && value !== 'false' && value !== 0 && value !== '0';
 }
+export function introPhotoMode(theme) {
+  return theme?.intro_photo_mode === 'random' ? 'random' : 'fixed';
+}
+export function randomIntroPhotos(photos = []) {
+  const seen = new Set();
+  const pool = photos.filter(photo => {
+    if (!photo?.image_path || seen.has(photo.image_path)) return false;
+    seen.add(photo.image_path);
+    return true;
+  });
+  // Partial Fisher–Yates: every distinct photo can be selected, at most once.
+  const count = Math.min(3, pool.length);
+  for (let i = 0; i < count; i++) {
+    const j = i + Math.floor(Math.random() * (pool.length - i));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, count);
+}
 export function pageSettings(site) {
   const theme = site?.theme || {};
   const colors = Object.fromEntries(Object.entries(DEFAULT_COLORS).map(([key, fallback]) =>

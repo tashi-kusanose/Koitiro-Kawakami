@@ -1,4 +1,4 @@
-import {introEnabled, pageSettings, applyAppearance, DEFAULT_COLORS} from './album-settings.js?v=20260930-2';
+import {introEnabled, introPhotoMode, pageSettings, applyAppearance, DEFAULT_COLORS} from './album-settings.js?v=20260930-3';
 import{createClient}from'https://esm.sh/@supabase/supabase-js@2.117.2';
 const sb=createClient('https://esfgrykcvdctnvdqipbj.supabase.co','sb_publishable_Rwb3qaRXdWZoo05LrbFaDg_29tMI7uI'),bucket='photo-album',maxPhotos=1500,$=s=>document.querySelector(s);
 const e={siteEyebrow:$('#siteEyebrow'),siteHeaderText:$('#siteHeaderText'),siteIntro:$('#siteIntro'),titleFont:$('#titleFont'),titleSize:$('#titleSize'),introFinalText:$('#introFinalText'),saveSite:$('#saveSite'),saveStatus:$('#saveStatus'),adminStatus:$('#adminStatus'),cBg:$('#cBg'),cSurface:$('#cSurface'),cText:$('#cText'),cMuted:$('#cMuted'),cAccent:$('#cAccent'),cHeader:$('#cHeader'),presetGrid:$('#presetGrid'),auth:$('#auth'),admin:$('#admin'),logout:$('#logout'),logoutMobile:$('#logoutMobile'),login:$('#login'),email:$('#email'),pass:$('#password'),magic:$('#magic'),newAlbum:$('#newAlbum'),navNew:$('#navNew'),navSettings:$('#navSettings'),navAlbums:$('#navAlbums'),list:$('#albumList'),qCount:$('#qCount'),qBytes:$('#qBytes'),qBar:$('#qBar'),settingsToggle:$('#settingsToggle'),settingsPanel:$('#settingsPanel'),siteForm:$('#siteForm'),siteTitle:$('#siteTitle'),introEnabled:$('#introEnabled'),sitePublished:$('#sitePublished'),previewLink:$('#previewLink'),introSelected:$('#introSelected'),picker:$('#photoPicker'),pickerMore:$('#pickerMore'),pickCount:$('#pickCount'),editor:$('#editor'),editorTitle:$('#editorTitle'),close:$('#closeEditor'),form:$('#albumForm'),groupKey:$('#groupKey'),year:$('#aYear'),pub:$('#aPub'),del:$('#deleteAlbum'),upload:$('#uploadBox'),files:$('#files'),progress:$('#progress'),pBar:$('#progressBar'),pText:$('#progressText'),photos:$('#photoGrid'),toast:$('#toast')};
@@ -73,6 +73,7 @@ function fillSite(){
   e.titleFont.value=settings.font;e.titleSize.value=settings.size;e.introFinalText.value=settings.finalText;
   for(const [key,id] of Object.entries(colorFields))e[id].value=settings.colors[key];
   e.introEnabled.checked=introEnabled(theme);e.sitePublished.checked=!!site.is_published;
+  $('#introPhotoMode').value=introPhotoMode(theme);renderIntroPhotoMode();
   introSelected=Array.isArray(theme.intro_photos)?theme.intro_photos.filter(photo=>photo?.image_path).slice(0,3):[];
   document.querySelectorAll('[data-public-link],#previewLink').forEach(link=>link.href='index.html?site='+encodeURIComponent(site.slug));
   $('#sideTitle').textContent=settings.title;document.title=settings.title+'｜アルバム管理';
@@ -80,7 +81,7 @@ function fillSite(){
 }
 async function saveSite(event){
   event.preventDefault();if(!site||!user||savingSite)return;
-  const theme={...(site.theme||{}),...formSettings().colors,title_font:e.titleFont.value,title_size:Number(e.titleSize.value),intro_final_text:e.introFinalText.value.trim(),intro_enabled:e.introEnabled.checked,intro_photos:introSelected.slice(0,3)};
+  const theme={...(site.theme||{}),...formSettings().colors,title_font:e.titleFont.value,title_size:Number(e.titleSize.value),intro_final_text:e.introFinalText.value.trim(),intro_enabled:e.introEnabled.checked,intro_photo_mode:$('#introPhotoMode').value,intro_photos:introSelected.slice(0,3)};
   const payload={page_title:e.siteTitle.value.trim(),eyebrow_text:e.siteEyebrow.value.trim(),header_text:e.siteHeaderText.value.trim(),intro_text:e.siteIntro.value.trim(),theme,is_published:e.sitePublished.checked};
   savingSite=true;setSettingsBusy(true);e.saveStatus.textContent='保存中…';e.saveSite.textContent='保存中…';
   try{
@@ -144,6 +145,11 @@ function renderIntroSelected(){
   e.introSelected.querySelectorAll('[data-move]').forEach(button=>button.onclick=()=>{const i=Number(button.dataset.move),j=i+Number(button.dataset.dir);[introSelected[i],introSelected[j]]=[introSelected[j],introSelected[i]];markDirty();renderIntroSelected()});
   renderPickerSelection();
 }
+function renderIntroPhotoMode(){
+  const random=$('#introPhotoMode').value==='random';
+  $('#fixedIntroPhotos').classList.toggle('hidden',random);
+  $('#randomIntroInfo').classList.toggle('hidden',!random);
+}
 async function loadPicker(reset=false){
   if(reset){pickerVersion++;pickerPhotos=[];pickerPage=0;pickerMore=true;pickerLoading=false}
   if(!site||!pickerMore||pickerLoading)return;
@@ -173,6 +179,7 @@ async function removeSavedIntroPhotos(deleted){
 renderPresets();
 e.siteForm.addEventListener('input',()=>{markDirty();renderHeaderPreview()});
 e.siteForm.addEventListener('change',markDirty);
+$('#introPhotoMode').addEventListener('change',renderIntroPhotoMode);
 addEventListener('beforeunload',event=>{if(settingsDirty||uploading){event.preventDefault();event.returnValue=''}});
 
 e.settingsToggle.onclick=()=>toggleSettings();e.navSettings.onclick=()=>toggleSettings(true);e.siteForm.onsubmit=saveSite;e.pickerMore.onclick=()=>loadPicker(false);e.login.onsubmit=async ev=>{ev.preventDefault();const{error}=await sb.auth.signInWithPassword({email:e.email.value,password:e.pass.value});if(error)toast(error.message)};e.magic.onclick=async()=>{const email=e.email.value.trim();if(!email)return toast('メールアドレスを入力してください');const{error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.href,shouldCreateUser:false}});toast(error?error.message:'ログインリンクを送信しました')};const logout=()=>sb.auth.signOut();e.logout.onclick=logout;e.logoutMobile.onclick=logout;e.newAlbum.onclick=fresh;e.navNew.onclick=fresh;e.navAlbums.onclick=()=>scrollTo({top:0,behavior:'smooth'});e.close.onclick=()=>e.editor.classList.add('hidden');e.form.onsubmit=saveGroup;e.del.onclick=()=>currentGroup&&removeGroup(currentGroup.key);e.files.onchange=v=>upload(v.target.files);['dragenter','dragover'].forEach(n=>e.upload.addEventListener(n,v=>{v.preventDefault();e.upload.classList.add('drag')}));['dragleave','drop'].forEach(n=>e.upload.addEventListener(n,v=>{v.preventDefault();e.upload.classList.remove('drag')}));e.upload.addEventListener('drop',v=>upload(v.dataTransfer.files));init();

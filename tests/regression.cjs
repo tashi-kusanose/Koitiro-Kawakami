@@ -48,6 +48,7 @@ async function mount(name,state){
   const html=fs.readFileSync(path.join(root,name+'.html'),'utf8').replace(/<script[^>]*>[\s\S]*?<\/script>/g,'');
   const dom=new JSDOM(html,{url:'https://album.test/'+name+'.html',runScripts:'outside-only',pretendToBeVisual:true});
   const w=dom.window;w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};w.matchMedia=()=>({matches:false});w.confirm=()=>true;w.console.error=()=>{};
+  if(state.random)w.Math.random=state.random;
   w.IntersectionObserver=class{observe(){}};
   w.Image=class{set src(value){queueMicrotask(()=>this.onload?.())}};
   const client=adapter(state);w.createClient=()=>client;
@@ -60,6 +61,68 @@ async function mount(name,state){
 function input(w,selector,value){const node=w.document.querySelector(selector);if(node.type==='checkbox')node.checked=value;else node.value=value;node.dispatchEvent(new w.Event('input',{bubbles:true}));node.dispatchEvent(new w.Event('change',{bubbles:true}))}
 function submit(w){w.document.querySelector('#siteForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}))}
 (async()=>{
+  // Random mode includes the whole public site, not only covers or the first API page.
+  let randomState=fixture(true);randomState.site.theme.intro_photo_mode='random';randomState.random=()=>0.999999;
+  randomState.albums.push({id:'private',site_id:'site',is_published:false},{id:'foreign',site_id:'other-site',is_published:true});
+  randomState.photos.push({id:'z-private',album_id:'private',image_path:'private.webp'},
+    {id:'z-foreign',album_id:'foreign',image_path:'foreign.webp'},
+    {...randomState.photos[1001],id:'z-duplicate'});
+  let randomApp=await mount('index',randomState);
+  await until(()=>!randomApp.doc.querySelector('#intro').classList.contains('hidden'),'random intro');
+  const displayed=app=>[...app.doc.querySelectorAll('.introCard img')].map(img=>img.src);
+  const firstDraw=displayed(randomApp);
+  assert.equal(firstDraw.length,3);assert.equal(new Set(firstDraw).size,3);
+  assert(firstDraw[0].endsWith('/thumbs/1001.webp'),'photos beyond row 1000 must be eligible');
+  assert(!firstDraw.some(src=>/private|foreign/.test(src)),'exclude private albums and other sites');
+  assert(randomState.log.some(q=>q.table==='photo_album_photos'&&q.range?.[0]===1000));
+  const fetches=randomState.log.filter(q=>q.table==='photo_album_photos').length;
+  randomApp.w.Math.random=()=>0;
+  randomApp.w.testAPI.finishIntro();await randomApp.w.testAPI.startIntro();
+  assert.notDeepEqual(displayed(randomApp),firstDraw,'replay must sample again');
+  assert.equal(randomState.log.filter(q=>q.table==='photo_album_photos').length,fetches,'reuse the candidate list on replay');
+  randomApp.close();
+
+  // A small library never duplicates photos to fill the three slots.
+  for(const count of [0,1,2]){
+    const small=fixture(true);small.site.theme.intro_photo_mode='random';small.photos=small.photos.slice(0,count);
+    randomApp=await mount('index',small);await until(()=>!randomApp.doc.querySelector('#intro').classList.contains('hidden'),'small random library');
+    assert.equal(displayed(randomApp).length,count);randomApp.close();
+  }
+  const disabled=fixture(false);disabled.site.theme.intro_photo_mode='random';
+  randomApp=await mount('index',disabled);await until(()=>randomApp.doc.querySelectorAll('.yearCard').length===2,'random OFF');
+  assert.equal(disabled.log.filter(q=>q.table==='photo_album_photos').length,0);randomApp.close();
+
+  // Leaving home while random candidates load must not start an intro over the year page.
+  const pending=fixture(true);pending.site.theme.intro_photo_mode='random';let releasePool;
+  pending.photoGate=()=>new Promise(resolve=>releasePool=()=>{pending.photoGate=null;resolve()});
+  randomApp=await mount('index',pending);await until(()=>!!releasePool,'pending candidates');
+  randomApp.w.testAPI.hideIntro();releasePool();await sleep(40);
+  assert(randomApp.doc.querySelector('#intro').classList.contains('hidden'));randomApp.close();
+
+  // A failed candidate request keeps playback usable with public album covers.
+  const failed=fixture(true);failed.site.theme.intro_photo_mode='random';failed.photoGate=()=>Promise.reject(new Error('offline'));
+  randomApp=await mount('index',failed);await until(()=>!randomApp.doc.querySelector('#intro').classList.contains('hidden'),'random fallback');
+  assert.equal(displayed(randomApp).length,2);randomApp.close();
+
+  // Mode changes survive save/reload and preserve the fixed selection and appearance.
+  const editable=fixture(true),fixedSelection=JSON.stringify(editable.site.theme.intro_photos);
+  randomApp=await mount('admin',editable);await until(()=>randomApp.doc.querySelector('#saveStatus').textContent==='保存済み','mode settings');
+  assert.equal(randomApp.doc.querySelector('#introPhotoMode').value,'fixed');
+  input(randomApp.w,'#introPhotoMode','random');
+  assert(randomApp.doc.querySelector('#fixedIntroPhotos').classList.contains('hidden'));
+  submit(randomApp.w);await until(()=>randomApp.doc.querySelector('#saveStatus').textContent.includes('保存しました'),'save random');
+  assert.equal(editable.site.theme.intro_photo_mode,'random');assert.equal(editable.site.theme.background,'#8cc9ff');
+  assert.equal(JSON.stringify(editable.site.theme.intro_photos),fixedSelection);randomApp.close();
+  randomApp=await mount('admin',editable);await until(()=>randomApp.doc.querySelector('#saveStatus').textContent==='保存済み','reload mode');
+  assert.equal(randomApp.doc.querySelector('#introPhotoMode').value,'random');
+  input(randomApp.w,'#introPhotoMode','fixed');
+  assert(!randomApp.doc.querySelector('#fixedIntroPhotos').classList.contains('hidden'));
+  submit(randomApp.w);await until(()=>randomApp.doc.querySelector('#saveStatus').textContent.includes('保存しました'),'save fixed');
+  assert.equal(editable.site.theme.intro_photo_mode,'fixed');assert.equal(JSON.stringify(editable.site.theme.intro_photos),fixedSelection);randomApp.close();
+  randomApp=await mount('index',editable);await until(()=>!randomApp.doc.querySelector('#intro').classList.contains('hidden'),'fixed playback');
+  assert.deepEqual(displayed(randomApp),editable.site.theme.intro_photos.map(photo=>'https://images.test/'+photo.thumb_path));randomApp.close();
+  console.log('PASS: random replay, all public photos, unique draws, pagination, OFF, cancellation, fallback, fixed-mode save/reload');
+
   // Regression: restore the approved palette, then save text/intro without reviving legacy blue.
   const modernPalette={background:'#fbfaf7',surface:'#ffffff',text:'#2d2a26',muted:'#918a80',accent:'#ad9166',header:'#ffffff'};
   const restored=fixture(false);Object.assign(restored.site.theme,modernPalette);

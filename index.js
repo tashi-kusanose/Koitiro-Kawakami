@@ -1,10 +1,11 @@
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.117.2';
-import {introEnabled, pageSettings, applyAppearance, uniqueIntroPhotos} from './album-settings.js?v=20260930-2';
+import {introEnabled, introPhotoMode, randomIntroPhotos, pageSettings, applyAppearance, uniqueIntroPhotos} from './album-settings.js?v=20260930-3';
 const sb=createClient('https://esfgrykcvdctnvdqipbj.supabase.co','sb_publishable_Rwb3qaRXdWZoo05LrbFaDg_29tMI7uI');
 const bucket='photo-album', PAGE=60, $=s=>document.querySelector(s);
 const e={home:$('#homeView'),detail:$('#detailView'),years:$('#years'),yearCount:$('#yearCount'),name:$('#displayName'),back:$('#back'),detailYear:$('#detailYear'),detailYearSmall:$('#detailYearSmall'),detailCount:$('#detailCount'),photos:$('#photos'),more:$('#more'),loadMore:$('#loadMore'),intro:$('#intro'),replay:$('#replay'),viewer:$('#viewer'),counter:$('#counter'),close:$('#close'),prev:$('#prev'),next:$('#next'),stage:$('#stage'),canvas:$('#canvas'),big:$('#big'),toast:$('#toast')};
 let site=null, albums=[], groups=[], active=null, photos=[], page=0, more=true, loading=false, idx=-1;
 let loadVersion=0, photoVersion=0, introVersion=0, introTimer, introHideTimer, lastFocus=null;
+let introPhotoPoolPromise=null;
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const publicUrl=p=>p?sb.storage.from(bucket).getPublicUrl(p).data.publicUrl:'';
 function toast(message){e.toast.textContent=message;e.toast.classList.remove('hidden');clearTimeout(toast.t);toast.t=setTimeout(()=>e.toast.classList.add('hidden'),4200)}
@@ -27,6 +28,7 @@ function renderHeader(){
 }
 async function load(){
   const version=++loadVersion;
+  introPhotoPoolPromise=null;
   hideIntro();e.replay.classList.add('hidden');
   try{
     const q=new URLSearchParams(location.search), slug=q.get('site');
@@ -66,9 +68,40 @@ function renderGroups(){
   e.years.innerHTML=groups.length?groups.map((g,i)=>`<button class="yearCard" data-year="${esc(g.year)}"><span class="fallback"></span>${g.cover?`<img loading="lazy" src="${esc(publicUrl(g.cover))}" alt="">`:''}<span class="yearShade"></span>${i===0&&g.year!=='年未設定'?'<span class="latest">最新</span>':''}<span class="arrow">›</span><span class="yearInfo"><span class="yearNum">${esc(g.year)}</span><span class="yearMeta">${g.count} photos</span></span></button>`).join(''):'<div class="empty">アルバムはまだありません。</div>';
   e.years.querySelectorAll('.yearCard').forEach(button=>button.onclick=()=>openYear(button.dataset.year,true));
 }
-function introPaths(){
+function introCovers(){
+  return albums.filter(a=>a.cover_path).map(a=>({image_path:a.cover_path,thumb_path:a.cover_path}));
+}
+function loadIntroPhotoPool(){
+  if(introPhotoPoolPromise)return introPhotoPoolPromise;
+  // Only query albums returned for this site's public page, even for a signed-in owner.
+  const ids=albums.map(album=>album.id);
+  const pending=(async()=>{
+    if(!ids.length)return [];
+    const collected=[],size=500;
+    for(let offset=0;;offset+=size){
+      const {data,error}=await sb.from('photo_album_photos').select('id,image_path,thumb_path')
+        .in('album_id',ids).order('id').range(offset,offset+size-1);
+      if(error)throw error;
+      collected.push(...(data||[]));
+      if((data||[]).length<size)return collected;
+    }
+  })();
+  introPhotoPoolPromise=pending;
+  pending.catch(()=>{if(introPhotoPoolPromise===pending)introPhotoPoolPromise=null});
+  return pending;
+}
+async function introPaths(){
+  if(introPhotoMode(site?.theme)==='random'){
+    const covers=introCovers();let timeout;
+    try{
+      // Load paths once per visit; download only the three selected photographs.
+      const pool=await Promise.race([loadIntroPhotoPool(),new Promise((_,reject)=>{timeout=setTimeout(()=>reject(new Error('Intro photo loading timed out')),3500)})]);
+      return randomIntroPhotos(pool);
+    }catch(error){console.error(error);return randomIntroPhotos(covers)}
+    finally{clearTimeout(timeout)}
+  }
   const selected=Array.isArray(site?.theme?.intro_photos)?site.theme.intro_photos:[];
-  return uniqueIntroPhotos(selected,albums.filter(a=>a.cover_path).map(a=>({image_path:a.cover_path,thumb_path:a.cover_path})));
+  return uniqueIntroPhotos(selected,introCovers());
 }
 function clearIntroTimers(){clearTimeout(introTimer);clearTimeout(introHideTimer)}
 function hideIntro(){introVersion++;clearIntroTimers();e.intro.classList.add('hidden');e.intro.classList.remove('out');e.intro.setAttribute('aria-hidden','true')}
@@ -80,7 +113,8 @@ function finishIntro(){
 async function startIntro(){
   if(!site||!introEnabled(site.theme))return;
   hideIntro();const version=introVersion;
-  const paths=introPaths(),settings=pageSettings(site);
+  const settings=pageSettings(site),paths=await introPaths();
+  if(version!==introVersion||!introEnabled(site?.theme))return;
   // Wait briefly for images, but a missing image never blocks the album.
   await Promise.race([
     Promise.all(paths.map(p=>new Promise(resolve=>{const img=new Image();img.onload=img.onerror=resolve;img.src=publicUrl(p.image_path)}))),
