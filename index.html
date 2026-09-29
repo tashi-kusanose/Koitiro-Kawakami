@@ -2,14 +2,14 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#fbfaf7">
 <meta name="robots" content="noindex,nofollow,noarchive">
 <meta name="referrer" content="no-referrer">
 <title>川上 公一郎｜アルバム</title>
 <style>
 :root{--bg:#fbfaf7;--paper:#fff;--ink:#2d2a26;--mut:#918a80;--line:#ebe6df;--gold:#ad9166;--shadow:0 12px 32px rgba(62,52,40,.08)}
-*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif;background:linear-gradient(180deg,#fff 0%,var(--bg) 100%);color:var(--ink)}button{font:inherit}.hidden{display:none!important}body.viewerOpen{overflow:hidden}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif;background:var(--bg);color:var(--ink)}button{font:inherit}.hidden{display:none!important}body.viewerOpen{overflow:hidden}
 .page{max-width:780px;margin:auto;padding:calc(env(safe-area-inset-top) + 22px) 18px 96px}.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:34px}.brand{font-size:11px;letter-spacing:.24em;color:var(--gold)}.topActions{display:flex;gap:8px}.pill{border:1px solid var(--line);background:rgba(255,255,255,.9);color:#655d53;padding:8px 12px;border-radius:999px;font-size:12px;text-decoration:none;cursor:pointer}
 .hero{padding:6px 0 34px}.hero h1{margin:0;font-family:"Yu Mincho","Hiragino Mincho ProN",serif;font-size:clamp(40px,10vw,66px);letter-spacing:.08em;font-weight:600}.hero p{margin:14px 0 0;color:var(--mut);font-size:14px;line-height:1.8}.sectionHead{display:flex;justify-content:space-between;align-items:end;margin-bottom:14px}.sectionHead h2{margin:0;font-size:16px}.sectionHead span{font-size:11px;color:var(--mut)}
 .years{display:grid;gap:14px}.yearCard{position:relative;border:0;padding:0;width:100%;text-align:left;border-radius:24px;overflow:hidden;min-height:190px;background:#eee;box-shadow:var(--shadow);cursor:pointer}.yearCard img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.yearCard .fallback{position:absolute;inset:0;background:linear-gradient(145deg,#d8c7b0,#f2e8dc 48%,#b9a58c)}.yearCard:nth-child(2n) .fallback{background:linear-gradient(145deg,#d9e1e4,#b8c4c9 48%,#eee9e2)}.yearCard:nth-child(3n) .fallback{background:linear-gradient(145deg,#ead8d2,#c8aba1 48%,#f3ece5)}.yearShade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(22,20,18,.52),rgba(22,20,18,.05) 74%)}.yearInfo{position:absolute;z-index:2;left:18px;right:18px;bottom:17px;color:#fff}.yearNum{font-family:Georgia,"Times New Roman",serif;font-size:50px;line-height:1}.yearMeta{font-size:11px;margin-top:8px;opacity:.92}.latest{position:absolute;z-index:3;left:16px;top:16px;background:rgba(255,255,255,.88);padding:6px 9px;border-radius:999px;font-size:10px;color:#665c50}.arrow{position:absolute;z-index:3;right:16px;top:16px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.88);display:grid;place-items:center;color:#4c443b;font-size:22px}.empty{padding:50px 20px;border:1px dashed var(--line);border-radius:20px;text-align:center;color:var(--mut);background:#fff}
@@ -21,56 +21,44 @@
 .toast{position:fixed;z-index:2000;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:calc(100% - 28px);padding:12px 16px;border-radius:999px;background:#2d2a26;color:#fff;font-size:12px}
 @media(min-width:760px){.page{padding-left:24px;padding-right:24px}.years{grid-template-columns:repeat(2,minmax(0,1fr))}.yearCard:first-child{grid-column:1/-1;min-height:260px}.masonry{columns:4}.nav{display:block}}
 @media(max-width:559px){.nav{display:none}}
+
+/* Saved header appearance and initial-state safety. */
+.hero{background:var(--header,#fff);border-radius:22px;padding:24px 20px;margin-bottom:26px}
+.hero h1{font-family:var(--title-font,"Yu Mincho",serif);font-size:clamp(28px,10vw,var(--title-size,66px));overflow-wrap:anywhere;white-space:pre-wrap}
+.hero p{white-space:pre-wrap;overflow-wrap:anywhere}.hero #headerText{color:var(--ink);font-size:16px}
+.brand{overflow-wrap:anywhere}.top{gap:12px}.topActions{flex-shrink:0}.pill,.back{background:var(--paper);color:var(--ink)}
+.empty,.sum{background:var(--paper)}.empty button{margin-top:14px}.intro.hidden *{animation:none!important}
+.introName,.finalCopy{padding:0 18px}.introName .main,.finalCopy .main{overflow-wrap:anywhere;white-space:pre-wrap}
+.introName .main{font-family:var(--title-font,"Yu Mincho",serif)}
+.nav:disabled{opacity:.3;cursor:default}.big{max-height:88dvh}.viewerHint{pointer-events:none}
+#loadMore{display:block;margin:0 auto 20px}.tile:focus-visible,.yearCard:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+@media(max-width:559px){.nav{display:block;top:auto;bottom:62px;width:36px;height:36px;font-size:24px}}
 </style>
 </head>
 <body>
 <main class="page">
 <section id="homeView">
-  <div class="top"><div class="brand">アルバム</div><div class="topActions"><button id="replay" class="pill">▶ イントロ</button><a class="pill" href="admin.html" aria-label="管理画面">管理</a></div></div>
-  <section class="hero"><h1 id="displayName">川上 公一郎</h1><p>年ごとに写真をまとめたアルバムです。<br>見たい年を選んでご覧ください。</p></section>
+  <div class="top"><div id="siteEyebrow" class="brand">アルバム</div><div class="topActions"><button id="replay" class="pill hidden">▶ イントロ</button><a class="pill" id="adminLink" href="admin.html" aria-label="管理画面">管理</a></div></div>
+  <section class="hero"><h1 id="displayName">川上 公一郎</h1><p id="headerText" class="hidden"></p><p id="pageDescription" class="hidden"></p></section>
   <div class="sectionHead"><h2>年別アルバム</h2><span id="yearCount">読み込み中...</span></div>
-  <div id="years" class="years"></div>
+  <div id="years" class="years"><div class="empty" role="status">アルバムを読み込んでいます…</div></div>
 </section>
 <section id="detailView" class="hidden">
-  <div class="detailTop"><button id="back" class="back">‹ 年一覧</button><span class="brand">アルバム</span></div>
+  <div class="detailTop"><button id="back" class="back">‹ 年一覧</button><span id="detailBrand" class="brand">アルバム</span></div>
   <section class="detailHero"><div class="kicker">YEAR ALBUM</div><h1 id="detailYear" class="detailYear"></h1><p class="detailDesc">この年の写真をまとめています。<br>写真をタップすると大きく表示できます。</p><div class="summary"><div class="sum"><b id="detailCount">0</b><span>写真</span></div><div class="sum"><b id="detailYearSmall">—</b><span>対象年</span></div></div></section>
-  <div class="photoHead"><h2>写真一覧</h2><span>写真をタップ</span></div><div id="photos" class="masonry"></div><div id="more" class="more"></div>
+  <div class="photoHead"><h2>写真一覧</h2><span>写真をタップ</span></div><div id="photos" class="masonry"></div><div id="more" class="more"></div><button id="loadMore" class="pill hidden" type="button">さらに写真を読み込む</button>
 </section>
 </main>
 
-<section id="intro" class="intro">
+<section id="intro" class="intro hidden" aria-hidden="true">
   <button id="skip" class="skip">SKIP</button><div class="introGlow"></div><div class="lightLine"></div>
   <div class="stack"><div class="introCard ic1" data-slot="0"></div><div class="introCard ic2" data-slot="1"></div><div class="introCard ic3" data-slot="2"></div></div>
   <div class="wash"></div><div class="introName"><div class="main">川上 公一郎</div><div class="sub">アルバム</div></div>
   <div id="expandPhoto" class="expandPhoto"></div><div class="finalCopy"><div class="main">思い出</div></div><div class="whiteFlash"></div>
 </section>
 
-<section id="viewer" class="viewer" aria-hidden="true"><div class="viewerTop"><div id="counter" class="counter"></div><button id="close" class="close">×</button></div><button id="prev" class="nav prev">‹</button><button id="next" class="nav next">›</button><div id="stage" class="stage"><div id="canvas" class="canvas"><img id="big" class="big" alt=""></div></div><div class="viewerHint">左右スワイプで移動 ・ ピンチ / ダブルタップで拡大</div></section>
+<section id="viewer" class="viewer" role="dialog" aria-modal="true" aria-label="写真ビューア" aria-hidden="true"><div class="viewerTop"><div id="counter" class="counter"></div><button id="close" class="close" aria-label="写真を閉じる">×</button></div><button id="prev" class="nav prev" aria-label="前の写真">‹</button><button id="next" class="nav next" aria-label="次の写真">›</button><div id="stage" class="stage"><div id="canvas" class="canvas"><img id="big" class="big" alt=""></div></div><div class="viewerHint">左右スワイプで移動 ・ ピンチ / ダブルタップで拡大</div></section>
 <div id="toast" class="toast hidden"></div>
-<script type="module">
-import{createClient}from'https://esm.sh/@supabase/supabase-js@2';
-const sb=createClient('https://esfgrykcvdctnvdqipbj.supabase.co','sb_publishable_Rwb3qaRXdWZoo05LrbFaDg_29tMI7uI');
-const bucket='photo-album',PAGE=60,$=s=>document.querySelector(s),DISPLAY='川上 公一郎';
-const e={home:$('#homeView'),detail:$('#detailView'),years:$('#years'),yearCount:$('#yearCount'),name:$('#displayName'),back:$('#back'),detailYear:$('#detailYear'),detailYearSmall:$('#detailYearSmall'),detailCount:$('#detailCount'),photos:$('#photos'),more:$('#more'),intro:$('#intro'),skip:$('#skip'),replay:$('#replay'),viewer:$('#viewer'),counter:$('#counter'),close:$('#close'),prev:$('#prev'),next:$('#next'),stage:$('#stage'),canvas:$('#canvas'),big:$('#big'),toast:$('#toast')};
-let site=null,albums=[],groups=[],active=null,photos=[],page=0,more=true,loading=false,idx=-1;
-const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-const publicUrl=p=>p?sb.storage.from(bucket).getPublicUrl(p).data.publicUrl:'';
-function toast(m){e.toast.textContent=m;e.toast.classList.remove('hidden');clearTimeout(toast.t);toast.t=setTimeout(()=>e.toast.classList.add('hidden'),3200)}
-function yearOf(a){if(a.album_date&&/^\d{4}/.test(a.album_date))return a.album_date.slice(0,4);const m=String(a.title||'').match(/(?:19|20)\d{2}/);return m?m[0]:null}
-function makeGroups(){const map=new Map();albums.forEach(a=>{const y=yearOf(a)||'年未設定';if(!map.has(y))map.set(y,{year:y,albums:[],count:0,cover:''});const g=map.get(y);g.albums.push(a);g.count+=Number(a.photo_count||0);if(!g.cover&&a.cover_path)g.cover=a.cover_path});groups=[...map.values()].sort((a,b)=>{if(a.year==='年未設定')return 1;if(b.year==='年未設定')return-1;return Number(b.year)-Number(a.year)})}
-async function load(){const q=new URLSearchParams(location.search),slug=q.get('site');let sq=sb.from('photo_album_sites_public').select('*');sq=slug?sq.eq('slug',slug):sq.order('created_at',{ascending:true}).limit(1);const s=await sq.maybeSingle();if(s.error)toast(s.error.message);site=s.data||null;if(!site){const{data:{session}}=await sb.auth.getSession();if(session){let pq=sb.from('photo_album_sites').select('*');pq=slug?pq.eq('slug',slug):pq.eq('owner_user_id',session.user.id).order('created_at',{ascending:true}).limit(1);const p=await pq.maybeSingle();if(!p.error&&p.data)site=p.data}}e.name.textContent=DISPLAY;document.title=DISPLAY+'｜アルバム';if(!site){albums=[];makeGroups();renderGroups();setupIntro();return}let aq=sb.from('photo_albums_public').select('*').eq('site_id',site.id);const r=await aq;if(r.error)return toast(r.error.message);albums=r.data||[];makeGroups();renderGroups();setupIntro();const old=q.get('album'),year=q.get('year');if(year)openYear(year,false);else if(old){const a=albums.find(x=>String(x.id)===old);if(a)openYear(yearOf(a)||'年未設定',false)}}
-function renderGroups(){e.yearCount.textContent=groups.length+' YEARS';e.years.innerHTML=groups.length?groups.map((g,i)=>`<button class="yearCard" data-year="${esc(g.year)}"><span class="fallback"></span>${g.cover?`<img loading="lazy" src="${esc(publicUrl(g.cover))}" alt="">`:''}<span class="yearShade"></span>${i===0&&g.year!=='年未設定'?'<span class="latest">最新</span>':''}<span class="arrow">›</span><span class="yearInfo"><span class="yearNum">${esc(g.year)}</span><span class="yearMeta">${g.count} photos</span></span></button>`).join(''):'<div class="empty">アルバムはまだありません。</div>';e.years.querySelectorAll('.yearCard').forEach(b=>b.onclick=()=>openYear(b.dataset.year,true))}
-function introPaths(){const arr=Array.isArray(site?.theme?.intro_photos)?site.theme.intro_photos.filter(x=>x?.image_path):[];const fallback=albums.filter(a=>a.cover_path).slice(0,3).map(a=>({image_path:a.cover_path,thumb_path:a.cover_path}));return [...arr,...fallback].slice(0,3)}
-function setupIntro(){const enabled=!!site&&site?.theme?.intro_enabled!==false;e.replay.classList.toggle('hidden',!enabled);if(!enabled){e.intro.classList.add('hidden');return}const paths=introPaths();document.querySelectorAll('.introCard').forEach((c,i)=>{if(paths[i])c.innerHTML=`<img src="${esc(publicUrl(paths[i].thumb_path||paths[i].image_path))}" alt="">`;else c.style.background='linear-gradient(150deg,#e7dfcf,#c1ad90 53%,#f5eee4)'});const main=paths[0];$('#expandPhoto').innerHTML=main?`<img src="${esc(publicUrl(main.image_path))}" alt="">`:'';startIntro()}
-let introTimer;function finishIntro(){clearTimeout(introTimer);e.intro.classList.add('out');setTimeout(()=>e.intro.classList.add('hidden'),900)}function startIntro(){if(!site||site?.theme?.intro_enabled===false)return;clearTimeout(introTimer);const old=e.intro,clone=old.cloneNode(true);old.replaceWith(clone);e.intro=clone;e.skip=$('#skip');e.skip.onclick=finishIntro;const paths=introPaths();document.querySelectorAll('.introCard').forEach((c,i)=>{if(paths[i])c.innerHTML=`<img src="${esc(publicUrl(paths[i].thumb_path||paths[i].image_path))}" alt="">`});const main=paths[0];$('#expandPhoto').innerHTML=main?`<img src="${esc(publicUrl(main.image_path))}" alt="">`:'';e.intro.classList.remove('hidden','out');introTimer=setTimeout(finishIntro,6700)}
-e.replay.onclick=startIntro;e.skip.onclick=finishIntro;
-async function openYear(year,push=true){active=groups.find(g=>g.year===year);if(!active)return;photos=[];page=0;more=true;e.home.classList.add('hidden');e.detail.classList.remove('hidden');e.detailYear.textContent=year;e.detailYearSmall.textContent=year;e.detailCount.textContent=active.count;e.photos.innerHTML='';e.more.textContent='';if(push){const q=new URLSearchParams(location.search);q.delete('album');q.set('year',year);history.pushState({year},'',location.pathname+'?'+q.toString())}await nextPage();scrollTo({top:0})}
-async function nextPage(){if(!active||!more||loading)return;loading=true;e.more.textContent='読み込み中...';const ids=active.albums.map(a=>a.id);const from=page*PAGE,to=from+PAGE-1;let q=sb.from('photo_album_photos').select('id,image_path,thumb_path,caption,position,album_id').in('album_id',ids).order('album_id',{ascending:true}).order('position',{ascending:true}).range(from,to);const r=await q;if(r.error){loading=false;return toast(r.error.message)}const batch=(r.data||[]).map(p=>({...p,image_url:publicUrl(p.image_path),thumb_url:publicUrl(p.thumb_path)})),base=photos.length;photos.push(...batch);batch.forEach((p,i)=>e.photos.insertAdjacentHTML('beforeend',`<button class="tile" data-i="${base+i}"><img loading="lazy" src="${esc(p.thumb_url)}" alt=""></button>`));e.photos.querySelectorAll('.tile:not([data-bound])').forEach(b=>{b.dataset.bound='1';b.onclick=()=>show(Number(b.dataset.i))});page++;more=batch.length===PAGE;e.more.textContent=more?'スクロールしてさらに表示':photos.length+' PHOTOS';loading=false}
-function back(){active=null;photos=[];e.detail.classList.add('hidden');e.home.classList.remove('hidden');const q=new URLSearchParams(location.search);q.delete('year');q.delete('album');history.pushState({},'',location.pathname+(q.toString()?'?'+q.toString():''));scrollTo({top:0})}e.back.onclick=back;new IntersectionObserver(v=>v[0]?.isIntersecting&&nextPage(),{rootMargin:'600px'}).observe(e.more);
-function show(i){idx=i;paint();e.viewer.classList.add('show');e.viewer.setAttribute('aria-hidden','false');document.body.classList.add('viewerOpen')}function paint(){const p=photos[idx];if(!p)return;resetZoom();e.big.src=p.image_url;e.counter.textContent=(idx+1)+' / '+photos.length;e.prev.disabled=idx<=0;e.next.disabled=idx>=photos.length-1&&!more}async function goNext(){if(idx<photos.length-1){idx++;paint()}else if(more){await nextPage();if(idx<photos.length-1){idx++;paint()}}}function goPrev(){if(idx>0){idx--;paint()}}function closeViewer(){e.viewer.classList.remove('show');e.viewer.setAttribute('aria-hidden','true');document.body.classList.remove('viewerOpen');resetZoom()}e.close.onclick=closeViewer;e.next.onclick=goNext;e.prev.onclick=goPrev;
-let scale=1,x=0,y=0,startX=0,startY=0,pinch=0,pinchScale=1,moved=false,lastTap=0;function dist(a,b){return Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY)}function apply(no=true){e.canvas.style.transition=no?'none':'transform .18s ease';e.canvas.style.transform=`translate(${x}px,${y}px) scale(${scale})`}function resetZoom(){scale=1;x=0;y=0;apply(false)}e.stage.addEventListener('touchstart',ev=>{moved=false;if(ev.touches.length===2){pinch=dist(ev.touches[0],ev.touches[1]);pinchScale=scale}else if(ev.touches.length===1){startX=ev.touches[0].clientX;startY=ev.touches[0].clientY}},{passive:false});e.stage.addEventListener('touchmove',ev=>{ev.preventDefault();moved=true;if(ev.touches.length===2){scale=Math.min(4,Math.max(1,pinchScale*(dist(ev.touches[0],ev.touches[1])/pinch)));apply(true)}else if(ev.touches.length===1&&scale>1){const dx=ev.touches[0].clientX-startX,dy=ev.touches[0].clientY-startY;x+=dx;y+=dy;startX=ev.touches[0].clientX;startY=ev.touches[0].clientY;apply(true)}},{passive:false});e.stage.addEventListener('touchend',ev=>{if(ev.touches.length)return;const now=Date.now();if(!moved&&now-lastTap<280){if(scale>1)resetZoom();else{scale=2;x=0;y=0;apply(false)}lastTap=0;return}if(!moved)lastTap=now;if(scale<=1.02){resetZoom();const t=ev.changedTouches?.[0];if(t){const dx=t.clientX-startX,dy=t.clientY-startY;if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy))(dx<0?goNext():goPrev())}}});
-addEventListener('keydown',ev=>{if(!e.viewer.classList.contains('show'))return;if(ev.key==='Escape')closeViewer();if(ev.key==='ArrowLeft')goPrev();if(ev.key==='ArrowRight')goNext()});addEventListener('popstate',()=>{const q=new URLSearchParams(location.search),year=q.get('year'),old=q.get('album');if(year)openYear(year,false);else if(old){const a=albums.find(x=>String(x.id)===old);a?openYear(yearOf(a)||'年未設定',false):back()}else if(!e.detail.classList.contains('hidden'))back()});
-load();
-</script>
+<script type="module" src="index.js?v=20260930-1"></script>
 </body>
 </html>
