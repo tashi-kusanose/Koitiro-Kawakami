@@ -26,6 +26,15 @@ function renderHeader(){
   $('meta[name="theme-color"]').content=settings.colors.background;
   $('#adminLink').href='admin.html'+(site?.slug?'?site='+encodeURIComponent(site.slug):'');
 }
+function revealPage(){
+  // The HTML covers the page before modules load; remove it only after the intro is ready.
+  const startup=$('#startup'),pageRoot=$('main.page');
+  document.body.classList.remove('booting');
+  pageRoot.removeAttribute('inert');pageRoot.removeAttribute('aria-hidden');
+  if(!startup||startup.classList.contains('leaving'))return;
+  startup.setAttribute('aria-hidden','true');startup.setAttribute('inert','');
+  startup.classList.add('leaving');setTimeout(()=>startup.remove(),550);
+}
 async function load(){
   const version=++loadVersion;
   introPhotoPoolPromise=null;
@@ -55,13 +64,13 @@ async function load(){
     e.replay.classList.toggle('hidden',!introEnabled(site.theme));
     await readRoute();
     // CSS animations only start after the saved settings have been read.
-    if(version===loadVersion&&!active&&introEnabled(site.theme)&&!matchMedia('(prefers-reduced-motion: reduce)').matches)startIntro();
+    if(version===loadVersion&&!active&&introEnabled(site.theme)&&!matchMedia('(prefers-reduced-motion: reduce)').matches)await startIntro();
   }catch(error){
     if(version!==loadVersion)return;
     hideIntro();e.yearCount.textContent='読み込みできませんでした';
     e.years.innerHTML='<div class="empty">アルバムを読み込めませんでした。<br><button id="retryLoad" class="pill" type="button">再読み込み</button></div>';
     $('#retryLoad').onclick=load;toast('読み込みに失敗しました。通信状態を確認して再読み込みしてください。');console.error(error);
-  }
+  }finally{if(version===loadVersion)revealPage()}
 }
 function renderGroups(){
   e.yearCount.textContent=groups.length+' YEARS';
@@ -115,9 +124,10 @@ async function startIntro(){
   hideIntro();const version=introVersion;
   const settings=pageSettings(site),paths=await introPaths();
   if(version!==introVersion||!introEnabled(site?.theme))return;
-  // Wait briefly for images, but a missing image never blocks the album.
+  // Preload the actual three card images and the expanded photograph before revealing them.
+  const imagePaths=[...new Set([...paths.map(p=>p.thumb_path||p.image_path),paths[0]?.image_path].filter(Boolean))];
   await Promise.race([
-    Promise.all(paths.map(p=>new Promise(resolve=>{const img=new Image();img.onload=img.onerror=resolve;img.src=publicUrl(p.image_path)}))),
+    Promise.all(imagePaths.map(path=>new Promise(resolve=>{const img=new Image();img.onload=img.onerror=resolve;img.src=publicUrl(path)}))),
     new Promise(resolve=>setTimeout(resolve,1500))
   ]);
   if(version!==introVersion||!introEnabled(site?.theme))return;

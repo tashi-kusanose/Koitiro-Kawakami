@@ -25,6 +25,7 @@ function adapter(state){
       async function run(){
         state.log.push({table,operation,payload,range});
         if(table==='photo_album_sites_public'&&state.delaySite)await state.delaySite;
+        if(table==='photo_album_sites_public'&&state.failSite)return {data:null,error:{message:'TEST: site unavailable'}};
         let rows=table.startsWith('photo_album_sites')?[state.site]:table==='photo_albums'||table==='photo_albums_public'?state.albums:state.photos;
         if(table==='photo_album_sites_public')rows=rows.filter(row=>row.is_published);
         if(table==='photo_albums_public')rows=rows.filter(row=>row.is_published);
@@ -46,11 +47,11 @@ function adapter(state){
 }
 async function mount(name,state){
   const html=fs.readFileSync(path.join(root,name+'.html'),'utf8').replace(/<script[^>]*>[\s\S]*?<\/script>/g,'');
-  const dom=new JSDOM(html,{url:'https://album.test/'+name+'.html',runScripts:'outside-only',pretendToBeVisual:true});
-  const w=dom.window;w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};w.matchMedia=()=>({matches:false});w.confirm=()=>true;w.console.error=()=>{};
+  const dom=new JSDOM(html,{url:state.url||'https://album.test/'+name+'.html',runScripts:'outside-only',pretendToBeVisual:true});
+  const w=dom.window;w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};w.matchMedia=()=>({matches:!!state.reducedMotion});w.confirm=()=>true;w.console.error=()=>{};
   if(state.random)w.Math.random=state.random;
   w.IntersectionObserver=class{observe(){}};
-  w.Image=class{set src(value){queueMicrotask(()=>this.onload?.())}};
+  w.Image=class{set src(value){state.imageRequests??=[];state.imageRequests.push(value);const loaded=()=>this.onload?.();if(state.imageGate)state.imageGate(loaded);else queueMicrotask(loaded)}};
   const client=adapter(state);w.createClient=()=>client;
   const shared=fs.readFileSync(path.join(root,'album-settings.js'),'utf8').replace(/^export /gm,'');
   const code=fs.readFileSync(path.join(root,name+'.js'),'utf8').replace(/^import.*?;[ \t]*$/gm,'');
@@ -61,6 +62,48 @@ async function mount(name,state){
 function input(w,selector,value){const node=w.document.querySelector(selector);if(node.type==='checkbox')node.checked=value;else node.value=value;node.dispatchEvent(new w.Event('input',{bubbles:true}));node.dispatchEvent(new w.Event('change',{bubbles:true}))}
 function submit(w){w.document.querySelector('#siteForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}))}
 (async()=>{
+  // Even before the JS module downloads, the HTML must not expose the album behind it.
+  const initial=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'));
+  assert.equal(initial.window.getComputedStyle(initial.window.document.querySelector('main.page')).visibility,'hidden');
+  assert(initial.window.document.querySelector('main.page').hasAttribute('inert'));
+  assert.equal(initial.window.document.querySelector('#startup .startupRetry').getAttribute('href'),'');initial.window.close();
+
+  // Delay settings, random-photo paths and image bytes separately to catch a first-paint flash.
+  const startupState=fixture(true);startupState.site.theme.intro_photo_mode='random';startupState.random=()=>0;
+  let releaseSettings,releaseCandidates;const imageLoads=[];
+  startupState.delaySite=new Promise(resolve=>releaseSettings=resolve);
+  startupState.photoGate=()=>new Promise(resolve=>releaseCandidates=()=>{startupState.photoGate=null;resolve()});
+  startupState.imageGate=loaded=>imageLoads.push(loaded);
+  let startupApp=await mount('index',startupState);
+  const mainVisibility=()=>startupApp.w.getComputedStyle(startupApp.doc.querySelector('main.page')).visibility;
+  assert.equal(mainVisibility(),'hidden');releaseSettings();
+  await until(()=>!!releaseCandidates,'startup candidate request');assert.equal(mainVisibility(),'hidden');
+  releaseCandidates();await until(()=>imageLoads.length===4,'startup image preload');assert.equal(mainVisibility(),'hidden');
+  const revealStates=[];const observer=new startupApp.w.MutationObserver(()=>{
+    if(!startupApp.doc.body.classList.contains('booting'))revealStates.push(!startupApp.doc.querySelector('#intro').classList.contains('hidden'));
+  });observer.observe(startupApp.doc.body,{attributes:true,attributeFilter:['class']});
+  imageLoads.forEach(loaded=>loaded());await until(()=>!startupApp.doc.body.classList.contains('booting'),'startup handoff');
+  assert.deepEqual(revealStates,[true],'the intro must already be visible when the page is released');observer.disconnect();
+  assert(!startupApp.doc.querySelector('main.page').hasAttribute('inert'));
+  assert(startupApp.doc.querySelector('#startup').classList.contains('leaving'));
+  for(const photo of startupApp.doc.querySelectorAll('#intro img'))assert(startupState.imageRequests.includes(photo.src),'preload the displayed thumbnail or expanded image');
+  startupApp.w.testAPI.finishIntro();await until(()=>startupApp.doc.querySelector('#intro').classList.contains('hidden'),'startup skip');
+  assert.equal(mainVisibility(),'visible');assert(!startupApp.doc.querySelector('#startup'));startupApp.close();
+
+  for(const scenario of ['off','reduced','year','unpublished','error']){
+    const state=fixture(scenario!=='off');state.site.theme.intro_photo_mode='random';
+    if(scenario==='reduced')state.reducedMotion=true;
+    if(scenario==='year')state.url='https://album.test/index.html?year=2025';
+    if(scenario==='unpublished'){state.site.is_published=false;state.session=null}
+    if(scenario==='error')state.failSite=true;
+    startupApp=await mount('index',state);await until(()=>!startupApp.doc.body.classList.contains('booting'),'startup '+scenario);
+    assert(startupApp.doc.querySelector('#intro').classList.contains('hidden'),scenario+' must not autoplay');
+    if(scenario==='year')assert(!startupApp.doc.querySelector('#detailView').classList.contains('hidden'));
+    if(scenario==='error')assert(startupApp.doc.querySelector('#retryLoad'));
+    startupApp.close();
+  }
+  console.log('PASS: no first-paint album flash, delayed settings/photos/images, smooth handoff, OFF, reduced motion, deep links and errors');
+
   // Random mode includes the whole public site, not only covers or the first API page.
   let randomState=fixture(true);randomState.site.theme.intro_photo_mode='random';randomState.random=()=>0.999999;
   randomState.albums.push({id:'private',site_id:'site',is_published:false},{id:'foreign',site_id:'other-site',is_published:true});
