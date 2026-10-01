@@ -1,0 +1,35 @@
+name: Album regressions
+on:
+  push:
+    paths:
+      - 'admin.html'
+      - 'admin.js'
+      - 'index.html'
+      - 'index.js'
+      - 'album-settings.js'
+      - 'tests/**'
+      - 'package*.json'
+      - '.github/workflows/album-regression.yml'
+  pull_request:
+    paths:
+      - 'admin.html'
+      - 'admin.js'
+      - 'index.html'
+      - 'index.js'
+      - 'album-settings.js'
+      - 'tests/**'
+      - 'package*.json'
+      - '.github/workflows/album-regression.yml'
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test

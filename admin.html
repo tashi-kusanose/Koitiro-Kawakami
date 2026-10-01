@@ -28,6 +28,7 @@ button:disabled{opacity:.5;cursor:wait}.saveActions{position:sticky;bottom:0;z-i
 .headerPreview{margin-top:8px;background:var(--header);color:var(--ink);border-radius:16px;padding:20px;overflow-wrap:anywhere}.headerPreview small{color:var(--gold);letter-spacing:.16em}.headerPreview h3{font-family:var(--title-font);font-size:clamp(28px,7vw,var(--title-size));margin:12px 0}.headerPreview p{white-space:pre-wrap;line-height:1.8;margin:8px 0}.headerPreview #previewDescription{font-size:13px;color:var(--mut)}
 .colorSettings{border:1px solid var(--line);border-radius:14px;padding:15px}.colorSettings summary{font-size:14px;font-weight:800;cursor:pointer}.colors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}.form .colorField{display:flex;align-items:center;gap:8px}.colorField input[type=color]{width:44px;height:40px;padding:2px}.presetGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}.presetBtn{border:1px solid var(--line);border-radius:10px;background:#fff;padding:9px;font-size:11px;cursor:pointer}.presetBtn.active{outline:2px solid var(--gold)}.swatches{display:flex;height:10px;margin-top:6px;border-radius:99px;overflow:hidden}.swatches i{flex:1}.slotControls{position:absolute;bottom:4px;left:3px;right:3px;display:flex;justify-content:center;gap:3px}.slotControls button{border:0;border-radius:7px;background:#fffe;min-width:25px;min-height:28px;color:#302b25;font-size:14px;cursor:pointer}.top h1{font-size:clamp(21px,6vw,28px)}.top>.primary{flex-shrink:0}.rowActions{flex-wrap:wrap}.row{grid-template-columns:70px minmax(0,1fr) auto}.thumb{max-width:100%}
 @media(min-width:760px){.presetGrid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.mediaUploadActions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}.photo.videoTile{background:#222}.photo .videoTag{position:absolute;left:5px;top:5px;padding:4px 7px;border-radius:7px;background:#000b;color:#fff;font-size:11px;font-weight:800}.photo .videoFallback{display:grid;place-items:center;height:100%;font-size:27px;color:white}.photo.videoTile img{height:100%;width:100%;object-fit:cover}.photo .coverBtn:disabled{opacity:.5;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -67,15 +68,15 @@ button:disabled{opacity:.5;cursor:wait}.saveActions{position:sticky;bottom:0;z-i
 <div class="saveActions"><button id="saveSite" class="primary" type="submit">設定を保存</button><span id="saveStatus" class="mut" role="status" aria-live="polite">読み込み中…</span></div>
 </form><a id="previewLink" class="previewLink" data-public-link href="index.html" target="_blank" rel="noopener">公開ページを確認 ↗</a></div></section>
 
-<div class="quota"><div class="quotaTop"><div><small class="mut">STORAGE GUIDE</small><br><strong id="qCount">0 / 1500枚</strong></div><span id="qBytes" class="mut">推定 0 MB</span></div><div class="track"><div id="qBar" class="bar"></div></div><p class="mut">既存画像・保存先は変更しません。元画像とEXIF/GPSは保存しない現在の仕様を維持します。</p></div>
+<div class="quota"><div class="quotaTop"><div><small class="mut">STORAGE GUIDE</small><br><strong id="qCount">0 / 1500枚</strong><span id="qVideos" class="mut" style="display:block;margin-top:5px">動画 0本 / 0 MB（1本30MBまで）</span></div><span id="qBytes" class="mut">推定 0 MB</span></div><div class="track"><div id="qBar" class="bar"></div></div><p class="mut">既存画像・保存先は変更しません。元画像とEXIF/GPSは保存しない現在の仕様を維持します。</p></div>
 <p id="adminStatus" class="mut" role="status"></p><div id="albumList" class="list"></div>
 
 <section id="editor" class="card editor hidden"><div class="editorHead"><div><small class="mut">EDIT YEAR</small><h2 id="editorTitle">年別アルバム編集</h2></div><button id="closeEditor" class="outline">閉じる</button></div>
 <form id="albumForm" class="form gridForm"><input id="groupKey" type="hidden"><label>年<input id="aYear" type="number" min="1900" max="2100" step="1" required placeholder="2026"></label><label class="switch"><input id="aPub" type="checkbox" checked><span>公開ページに表示する</span></label><div class="actions span2"><button class="primary">保存</button><button id="deleteAlbum" class="danger hidden" type="button">この年を削除</button></div></form>
-<div id="uploadBox" class="uploadBox hidden"><strong>この年に写真を追加</strong><p class="mut">ここへ写真をドラッグ＆ドロップ、または端末からまとめて選択できます。</p><label class="upload">ファイルを選択<input id="files" type="file" accept="image/*" multiple></label></div>
+<div id="uploadBox" class="uploadBox hidden"><strong>この年に写真・動画を追加</strong><p class="mut">ここへ写真・動画をドラッグ＆ドロップ、または端末からまとめて選択できます。</p><div class="mediaUploadActions"><label class="upload">写真を選択<input id="files" type="file" accept="image/*" multiple></label><label class="upload">動画を選択<input id="videoFiles" type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" multiple></label></div><p class="mut">動画は1本30MBまで。MP4（H.264）推奨。MOVは閲覧端末によって再生できない場合があります。</p></div>
 <div id="progress" class="progressWrap hidden"><div class="progressTrack"><div id="progressBar" class="progressBar"></div></div><p id="progressText" class="mut"></p></div><div id="photoGrid" class="photos"></div></section>
 </main></div></section>
 <div id="toast" class="toast hidden"></div>
-<script type="module" src="admin.js?v=20260930-3"></script>
+<script type="module" src="admin.js?v=20261002-1"></script>
 </body>
 </html>
