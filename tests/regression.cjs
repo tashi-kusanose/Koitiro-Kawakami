@@ -12,16 +12,16 @@ function fixture(enabled=false){
   return {
     site:{id:'site',slug:'album-test',owner_user_id:'owner',page_title:'川上 公一朗',eyebrow_text:'アルバム',header_text:'大切な思い出',intro_text:'一行目\n二行目',is_published:true,updated_at:'version-1',theme:{intro_enabled:enabled,intro_photos:photos.slice(0,3),custom_setting:'retain-me',background:'#8cc9ff'}},
     albums:[{id:'a2026',site_id:'site',owner_user_id:'owner',album_date:'2026-01-01',title:'2026年',is_published:true,photo_count:1001,photos:[{count:1001}],cover_path:'thumbs/0.webp'},{id:'a2025',site_id:'site',owner_user_id:'owner',album_date:'2025-01-01',title:'2025年',is_published:true,photo_count:1,photos:[{count:1}],cover_path:'thumbs/1001.webp'}],
-    photos, videos:[], log:[], authCallbacks:[], delaySite:null, photoGate:null, failSave:false, conflict:false,session:{user:{id:'owner'}}
+    photos, videos:[], storageUploads:[], log:[], authCallbacks:[], delaySite:null, photoGate:null, failSave:false, conflict:false,session:{user:{id:'owner'},access_token:'test-token'}
   };
 }
 function adapter(state){
   return {
-    storage:{from:()=>({getPublicUrl:p=>({data:{publicUrl:'https://images.test/'+p}}),remove:async()=>({error:null})})},
+    storage:{from:bucket=>({getPublicUrl:p=>({data:{publicUrl:'https://images.test/'+p}}),upload:async(p,file)=>{state.storageUploads.push({bucket,path:p,size:file.size});return {error:null}},remove:async()=>({error:null})})},
     auth:{getSession:async()=>({data:{session:state.session}}),onAuthStateChange:fn=>{state.authCallbacks.push(fn);return {data:{subscription:{unsubscribe(){}}}}},signOut:async()=>{state.session=null;state.authCallbacks.forEach(fn=>fn('SIGNED_OUT',null));return {error:null}}},
     from(table){
       const filters=[],sorts=[];let range=null,operation='select',payload=null,single=false;
-      const query={select(){return this},eq(k,v){filters.push(row=>String(row[k])===String(v));return this},in(k,values){filters.push(row=>values.includes(row[k]));return this},order(key,options={}){sorts.push([key,options.ascending!==false]);return this},range(a,b){range=[a,b];return this},limit(n){range=[0,n-1];return this},maybeSingle(){single=true;return this},single(){single=true;return this},update(value){operation='update';payload=value;return this},delete(){operation='delete';return this},then(resolve,reject){return run().then(resolve,reject)}};
+      const query={select(){return this},eq(k,v){filters.push(row=>String(row[k])===String(v));return this},in(k,values){filters.push(row=>values.includes(row[k]));return this},order(key,options={}){sorts.push([key,options.ascending!==false]);return this},range(a,b){range=[a,b];return this},limit(n){range=[0,n-1];return this},maybeSingle(){single=true;return this},single(){single=true;return this},update(value){operation='update';payload=value;return this},insert(value){operation='insert';payload=value;return this},delete(){operation='delete';return this},then(resolve,reject){return run().then(resolve,reject)}};
       async function run(){
         state.log.push({table,operation,payload,range});
         if(table==='photo_album_sites_public'&&state.delaySite)await state.delaySite;
@@ -31,6 +31,7 @@ function adapter(state){
         if(table==='photo_albums_public')rows=rows.filter(row=>row.is_published);
         rows=rows.filter(row=>filters.every(fn=>fn(row)));
         if(table==='photo_album_photos'&&state.photoGate)await state.photoGate(rows);
+        if(operation==='insert'){if(table==='photo_album_videos')state.videos.push({id:'uploaded-'+state.videos.length,created_at:'2026-10-02T00:00:00Z',...payload});return {data:null,error:null}}
         if(operation==='update'){
           if(state.failSave)return {data:null,error:{message:'TEST: network write failed'}};
           if(state.conflict)return {data:null,error:null};
@@ -55,7 +56,7 @@ async function mount(name,state){
   const client=adapter(state);w.createClient=()=>client;
   const shared=fs.readFileSync(path.join(root,'album-settings.js'),'utf8').replace(/^export /gm,'');
   const code=fs.readFileSync(path.join(root,name+'.js'),'utf8').replace(/^import.*?;[ \t]*$/gm,'');
-  const expose=name==='index'?'window.testAPI={openYear,nextPage,home,startIntro,finishIntro,hideIntro,getPhotos:()=>photos};':'window.testAPI={loadPicker,removeSavedIntroPhotos};';
+  const expose=name==='index'?'window.testAPI={openYear,nextPage,home,startIntro,finishIntro,hideIntro,getPhotos:()=>photos};':'window.testAPI={loadPicker,removeSavedIntroPhotos,editGroup,uploadVideos};';
   w.eval(shared+'\n'+code+'\n'+expose);
   return {w,doc:w.document,close:()=>w.close()};
 }
@@ -228,7 +229,20 @@ function submit(w){w.document.querySelector('#siteForm').dispatchEvent(new w.Eve
   assert.equal(videoApp.doc.querySelectorAll('#photoPicker .pick').length,96,'intro still selects photographs only');
   assert.equal(videoApp.doc.querySelector('#videoFiles').accept.includes('video/mp4'),true);
   videoApp.close();
-  console.log('PASS: video counts, mixed year viewer, playback cleanup, video usage, photograph-only intro');
+  const uploadState=fixture(false);
+  const uploadApp=await mount('admin',uploadState);
+  await until(()=>uploadApp.doc.querySelector('#qCount').textContent.startsWith('1002'),'admin video upload setup');
+  await uploadApp.w.testAPI.editGroup('2026');
+  const sample=new uploadApp.w.File(['dummy mp4 content'],'demo.mp4',{type:'video/mp4'});
+  await uploadApp.w.testAPI.uploadVideos([sample]);
+  assert.equal(uploadState.videos.length,1,'upload saves a new video metadata row');
+  assert.equal(uploadState.videos[0].video_bytes,sample.size,'recorded video bytes must match file size');
+  assert.equal(uploadState.storageUploads.filter(item=>item.bucket==='photo-album-videos').length,1,'video uses a separate bucket');
+  assert(uploadApp.doc.querySelector('#qVideos').textContent.includes('1本'),'admin usage updates');
+  await uploadApp.w.testAPI.uploadVideos([new uploadApp.w.File(['x'],'wrong.txt',{type:'text/plain'})]);
+  assert.equal(uploadState.videos.length,1,'unsupported uploads never insert rows');
+  uploadApp.close();
+  console.log('PASS: video counts, mixed year viewer, playback cleanup, photograph-only intro, video upload and invalid-file rejection');
 
   state=fixture(true);app=await mount('index',state);
   await until(()=>!app.doc.querySelector('#intro').classList.contains('hidden'),'intro ON');
