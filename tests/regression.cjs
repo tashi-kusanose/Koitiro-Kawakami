@@ -49,7 +49,7 @@ function adapter(state){
 async function mount(name,state){
   const html=fs.readFileSync(path.join(root,name+'.html'),'utf8').replace(/<script[^>]*>[\s\S]*?<\/script>/g,'');
   const dom=new JSDOM(html,{url:state.url||'https://album.test/'+name+'.html',runScripts:'outside-only',pretendToBeVisual:true});
-  const w=dom.window;w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};w.matchMedia=()=>({matches:!!state.reducedMotion});w.confirm=()=>true;w.console.error=()=>{};
+  const w=dom.window;w.crypto.randomUUID??=()=> 'mock-video-uuid';w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};w.matchMedia=()=>({matches:!!state.reducedMotion});w.confirm=()=>true;w.console.error=()=>{};
   if(state.random)w.Math.random=state.random;
   w.IntersectionObserver=class{observe(){}};
   w.Image=class{set src(value){state.imageRequests??=[];state.imageRequests.push(value);const loaded=()=>this.onload?.();if(state.imageGate)state.imageGate(loaded);else queueMicrotask(loaded)}};
