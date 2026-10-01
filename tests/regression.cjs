@@ -12,7 +12,7 @@ function fixture(enabled=false){
   return {
     site:{id:'site',slug:'album-test',owner_user_id:'owner',page_title:'川上 公一朗',eyebrow_text:'アルバム',header_text:'大切な思い出',intro_text:'一行目\n二行目',is_published:true,updated_at:'version-1',theme:{intro_enabled:enabled,intro_photos:photos.slice(0,3),custom_setting:'retain-me',background:'#8cc9ff'}},
     albums:[{id:'a2026',site_id:'site',owner_user_id:'owner',album_date:'2026-01-01',title:'2026年',is_published:true,photo_count:1001,photos:[{count:1001}],cover_path:'thumbs/0.webp'},{id:'a2025',site_id:'site',owner_user_id:'owner',album_date:'2025-01-01',title:'2025年',is_published:true,photo_count:1,photos:[{count:1}],cover_path:'thumbs/1001.webp'}],
-    photos, log:[], authCallbacks:[], delaySite:null, photoGate:null, failSave:false, conflict:false,session:{user:{id:'owner'}}
+    photos, videos:[], log:[], authCallbacks:[], delaySite:null, photoGate:null, failSave:false, conflict:false,session:{user:{id:'owner'}}
   };
 }
 function adapter(state){
@@ -26,7 +26,7 @@ function adapter(state){
         state.log.push({table,operation,payload,range});
         if(table==='photo_album_sites_public'&&state.delaySite)await state.delaySite;
         if(table==='photo_album_sites_public'&&state.failSite)return {data:null,error:{message:'TEST: site unavailable'}};
-        let rows=table.startsWith('photo_album_sites')?[state.site]:table==='photo_albums'||table==='photo_albums_public'?state.albums:state.photos;
+        let rows=table.startsWith('photo_album_sites')?[state.site]:table==='photo_albums'||table==='photo_albums_public'?state.albums:table==='photo_album_videos'?state.videos:state.photos;
         if(table==='photo_album_sites_public')rows=rows.filter(row=>row.is_published);
         if(table==='photo_albums_public')rows=rows.filter(row=>row.is_published);
         rows=rows.filter(row=>filters.every(fn=>fn(row)));
@@ -204,6 +204,31 @@ function submit(w){w.document.querySelector('#siteForm').dispatchEvent(new w.Eve
   const historyLength=app.w.history.length;app.w.history.replaceState({},'','/index.html');app.w.dispatchEvent(new app.w.PopStateEvent('popstate'));await sleep(5);
   assert.equal(app.w.history.length,historyLength,'popstate cannot push new history entries');
   app.close();console.log('PASS: initial OFF, saved title/description, year request race, back history');
+
+  // Video rows are additive: preserve the photo table, photo intro, and year navigation.
+  const mixed=fixture(false);
+  mixed.videos=[
+   {id:'v-2026',album_id:'a2026',owner_user_id:'owner',video_path:'owner/a2026/demo.mp4',thumb_path:'owner/a2026/video-thumbs/demo.webp',video_bytes:10000,mime_type:'video/mp4',caption:'思い出の動画',created_at:'2026-10-01T12:00:00Z'},
+   {id:'v-2025',album_id:'a2025',owner_user_id:'owner',video_path:'owner/a2025/old.mp4',thumb_path:null,video_bytes:20000,mime_type:'video/mp4',created_at:'2025-10-01T12:00:00Z'}
+  ];
+  let videoApp=await mount('index',mixed);
+  await until(()=>videoApp.doc.querySelectorAll('.yearCard').length===2,'mixed public albums');
+  assert(videoApp.doc.querySelector('[data-year="2026"] .yearMeta').textContent.includes('動画 1本'));
+  await videoApp.w.testAPI.openYear('2026');
+  assert.equal(videoApp.doc.querySelectorAll('.videoTile').length,1,'video appears in photo album');
+  assert.equal(videoApp.w.testAPI.getPhotos()[0].kind,'video','video precedes photos in the same viewer');
+  videoApp.doc.querySelector('.videoTile').click();
+  assert(videoApp.doc.querySelector('#bigVideo').src.endsWith('/owner/a2026/demo.mp4'),'viewer opens full resolution video');
+  videoApp.doc.querySelector('#next').click();
+  assert.equal(videoApp.doc.querySelector('#bigVideo').hasAttribute('src'),false,'video source is released on photo transition');
+  assert(videoApp.doc.querySelector('#big').src.endsWith('/images/0.webp'));
+  videoApp.close();
+  videoApp=await mount('admin',mixed);await until(()=>videoApp.doc.querySelector('#qVideos').textContent.includes('2本'),'video usage');
+  await videoApp.w.testAPI.loadPicker(true);
+  assert.equal(videoApp.doc.querySelectorAll('#photoPicker .pick').length,96,'intro still selects photographs only');
+  assert.equal(videoApp.doc.querySelector('#videoFiles').accept.includes('video/mp4'),true);
+  videoApp.close();
+  console.log('PASS: video counts, mixed year viewer, playback cleanup, video usage, photograph-only intro');
 
   state=fixture(true);app=await mount('index',state);
   await until(()=>!app.doc.querySelector('#intro').classList.contains('hidden'),'intro ON');
