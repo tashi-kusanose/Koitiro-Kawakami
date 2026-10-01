@@ -1,18 +1,29 @@
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.117.2';
 import {introEnabled, introPhotoMode, randomIntroPhotos, pageSettings, applyAppearance, uniqueIntroPhotos} from './album-settings.js?v=20260930-3';
 const sb=createClient('https://esfgrykcvdctnvdqipbj.supabase.co','sb_publishable_Rwb3qaRXdWZoo05LrbFaDg_29tMI7uI');
-const bucket='photo-album', PAGE=60, $=s=>document.querySelector(s);
-const e={home:$('#homeView'),detail:$('#detailView'),years:$('#years'),yearCount:$('#yearCount'),name:$('#displayName'),back:$('#back'),detailYear:$('#detailYear'),detailYearSmall:$('#detailYearSmall'),detailCount:$('#detailCount'),photos:$('#photos'),more:$('#more'),loadMore:$('#loadMore'),intro:$('#intro'),replay:$('#replay'),viewer:$('#viewer'),counter:$('#counter'),close:$('#close'),prev:$('#prev'),next:$('#next'),stage:$('#stage'),canvas:$('#canvas'),big:$('#big'),toast:$('#toast')};
-let site=null, albums=[], groups=[], active=null, photos=[], page=0, more=true, loading=false, idx=-1;
+const bucket='photo-album',videoBucket='photo-album-videos', PAGE=60, $=s=>document.querySelector(s);
+const e={home:$('#homeView'),detail:$('#detailView'),years:$('#years'),yearCount:$('#yearCount'),name:$('#displayName'),back:$('#back'),detailYear:$('#detailYear'),detailYearSmall:$('#detailYearSmall'),detailCount:$('#detailCount'),photos:$('#photos'),more:$('#more'),loadMore:$('#loadMore'),intro:$('#intro'),replay:$('#replay'),viewer:$('#viewer'),counter:$('#counter'),close:$('#close'),prev:$('#prev'),next:$('#next'),stage:$('#stage'),canvas:$('#canvas'),big:$('#big'),bigVideo:$('#bigVideo'),viewerHint:$('#viewerHint'),toast:$('#toast')};
+let site=null, albums=[], videoRows=[], groups=[], active=null, photos=[], page=0, more=true, loading=false, idx=-1;
 let loadVersion=0, photoVersion=0, introVersion=0, introTimer, introHideTimer, lastFocus=null;
 let introPhotoPoolPromise=null;
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const publicUrl=p=>p?sb.storage.from(bucket).getPublicUrl(p).data.publicUrl:'';
+const videoUrl=p=>p?sb.storage.from(videoBucket).getPublicUrl(p).data.publicUrl:'';
 function toast(message){e.toast.textContent=message;e.toast.classList.remove('hidden');clearTimeout(toast.t);toast.t=setTimeout(()=>e.toast.classList.add('hidden'),4200)}
 function yearOf(a){if(a.album_date&&/^\d{4}/.test(a.album_date))return a.album_date.slice(0,4);const m=String(a.title||'').match(/(?:19|20)\d{2}/);return m?m[0]:null}
+async function loadVideoRows(ids){
+ videoRows=[];if(!ids.length)return;
+ for(let offset=0;;offset+=500){
+  const result=await sb.from('photo_album_videos').select('id,album_id,video_path,thumb_path,caption,created_at').in('album_id',ids)
+   .order('created_at',{ascending:false}).order('id').range(offset,offset+499);
+  if(result.error)throw result.error;
+  videoRows.push(...(result.data||[]));
+  if((result.data||[]).length<500)break;
+ }
+}
 function makeGroups(){
-  const map=new Map();
-  for(const a of albums){const year=yearOf(a)||'年未設定';if(!map.has(year))map.set(year,{year,albums:[],count:0,cover:''});const g=map.get(year);g.albums.push(a);g.count+=Number(a.photo_count||0);if(!g.cover&&a.cover_path)g.cover=a.cover_path}
+  const map=new Map(),counts=new Map();videoRows.forEach(v=>counts.set(v.album_id,(counts.get(v.album_id)||0)+1));
+  for(const a of albums){const year=yearOf(a)||'年未設定';if(!map.has(year))map.set(year,{year,albums:[],count:0,cover:''});const g=map.get(year);g.albums.push(a);g.count+=Number(a.photo_count||0)+(counts.get(a.id)||0);g.videoCount=(g.videoCount||0)+(counts.get(a.id)||0);if(!g.cover&&a.cover_path)g.cover=a.cover_path}
   groups=[...map.values()].sort((a,b)=>a.year==='年未設定'?1:b.year==='年未設定'?-1:Number(b.year)-Number(a.year));
 }
 function text(id,value){const node=$(id);node.textContent=value;node.classList.toggle('hidden',!value)}
@@ -54,13 +65,13 @@ async function load(){
       }
     }
     if(version!==loadVersion)return;
-    site=nextSite;albums=[];renderHeader();
+    site=nextSite;albums=[];videoRows=[];renderHeader();
     if(!site){makeGroups();renderGroups();e.years.innerHTML='<div class="empty">このアルバムは現在公開されていません。</div>';e.yearCount.textContent='';return}
     const resultAlbums=await sb.from('photo_albums_public').select('*').eq('site_id',site.id)
       .order('album_date',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false}).order('id');
     if(resultAlbums.error)throw resultAlbums.error;
     if(version!==loadVersion)return;
-    albums=resultAlbums.data||[];makeGroups();renderGroups();
+    albums=resultAlbums.data||[];await loadVideoRows(albums.map(a=>a.id));if(version!==loadVersion)return;makeGroups();renderGroups();
     e.replay.classList.toggle('hidden',!introEnabled(site.theme));
     await readRoute();
     // CSS animations only start after the saved settings have been read.
@@ -74,11 +85,11 @@ async function load(){
 }
 function renderGroups(){
   e.yearCount.textContent=groups.length+' YEARS';
-  e.years.innerHTML=groups.length?groups.map((g,i)=>`<button class="yearCard" data-year="${esc(g.year)}"><span class="fallback"></span>${g.cover?`<img loading="lazy" src="${esc(publicUrl(g.cover))}" alt="">`:''}<span class="yearShade"></span>${i===0&&g.year!=='年未設定'?'<span class="latest">最新</span>':''}<span class="arrow">›</span><span class="yearInfo"><span class="yearNum">${esc(g.year)}</span><span class="yearMeta">${g.count} photos</span></span></button>`).join(''):'<div class="empty">アルバムはまだありません。</div>';
+  e.years.innerHTML=groups.length?groups.map((g,i)=>`<button class="yearCard" data-year="${esc(g.year)}"><span class="fallback"></span>${g.cover?`<img loading="lazy" src="${esc(publicUrl(g.cover))}" alt="">`:''}<span class="yearShade"></span>${i===0&&g.year!=='年未設定'?'<span class="latest">最新</span>':''}<span class="arrow">›</span><span class="yearInfo"><span class="yearNum">${esc(g.year)}</span><span class="yearMeta">${g.count} 件（動画 ${g.videoCount||0}本）</span></span></button>`).join(''):'<div class="empty">アルバムはまだありません。</div>';
   e.years.querySelectorAll('.yearCard').forEach(button=>button.onclick=()=>openYear(button.dataset.year,true));
 }
 function introCovers(){
-  return albums.filter(a=>a.cover_path).map(a=>({image_path:a.cover_path,thumb_path:a.cover_path}));
+  return albums.filter(a=>a.cover_path&&!a.cover_path.includes('/video-thumbs/')).map(a=>({image_path:a.cover_path,thumb_path:a.cover_path}));
 }
 function loadIntroPhotoPool(){
   if(introPhotoPoolPromise)return introPhotoPoolPromise;
@@ -148,9 +159,9 @@ async function startIntro(){
 e.replay.onclick=startIntro;$('#skip').onclick=finishIntro;
 async function openYear(year,push=true){
   const group=groups.find(g=>g.year===year);if(!group)return;
-  hideIntro();closeViewer();photoVersion++;active=group;photos=[];page=0;more=true;loading=false;
+  hideIntro();closeViewer();photoVersion++;active=group;const ids=new Set(group.albums.map(a=>a.id));photos=videoRows.filter(v=>ids.has(v.album_id)).map(v=>({...v,kind:'video',image_url:videoUrl(v.video_path),thumb_url:publicUrl(v.thumb_path)}));page=0;more=true;loading=false;
   e.home.classList.add('hidden');e.detail.classList.remove('hidden');e.detailYear.textContent=year;
-  e.detailYearSmall.textContent=year;e.detailCount.textContent=group.count;e.photos.innerHTML='';e.more.textContent='';e.loadMore.classList.add('hidden');
+  e.detailYearSmall.textContent=year;e.detailCount.textContent=group.count;e.photos.innerHTML=photos.map((video,i)=>`<button class="tile videoTile" data-i="${i}" aria-label="${esc(video.caption||'動画 '+(i+1))}">${video.thumb_url?`<img loading="lazy" src="${esc(video.thumb_url)}" alt="">`:'<span class="videoBlank"></span>'}<span class="playIcon" aria-hidden="true">▶</span><span class="videoLabel">VIDEO</span></button>`).join('');e.photos.querySelectorAll('.videoTile').forEach(button=>button.onclick=()=>show(Number(button.dataset.i)));e.more.textContent='';e.loadMore.classList.add('hidden');
   if(push){const q=new URLSearchParams(location.search);q.delete('album');q.set('year',year);history.pushState({albumYear:true},'',location.pathname+'?'+q)}
   scrollTo({top:0});await nextPage();
 }
@@ -166,7 +177,7 @@ async function nextPage(){
     photos.push(...batch);
     batch.forEach((p,i)=>e.photos.insertAdjacentHTML('beforeend',`<button class="tile" data-i="${base+i}" aria-label="${esc(p.caption||'写真 '+(base+i+1))}"><img loading="lazy" src="${esc(p.thumb_url)}" alt="${esc(p.caption||'')}"></button>`));
     e.photos.querySelectorAll('.tile:not([data-bound])').forEach(b=>{b.dataset.bound='1';b.onclick=()=>show(Number(b.dataset.i))});
-    page++;more=batch.length===PAGE;e.more.textContent=more?'スクロールしてさらに表示':photos.length+' PHOTOS';
+    page++;more=batch.length===PAGE;e.more.textContent=more?'スクロールしてさらに表示':photos.length+' 件の写真・動画';
     e.loadMore.textContent='さらに写真を読み込む';e.loadMore.classList.toggle('hidden',!more);
   }catch(error){if(version===photoVersion){e.more.textContent='写真を読み込めませんでした';e.loadMore.textContent='もう一度読み込む';e.loadMore.classList.remove('hidden');toast('写真の読み込みに失敗しました。再試行できます。');console.error(error)}}
   finally{if(version===photoVersion)loading=false}
@@ -186,12 +197,26 @@ e.back.onclick=()=>history.state?.albumYear?history.back():home(true);
 e.loadMore.onclick=nextPage;
 new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting))nextPage()},{rootMargin:'600px'}).observe(e.more);
 function show(i){if(!photos[i])return;idx=i;lastFocus=document.activeElement;paint();e.viewer.classList.add('show');e.viewer.setAttribute('aria-hidden','false');document.body.classList.add('viewerOpen');e.close.focus()}
-function paint(){const photo=photos[idx];if(!photo)return;resetZoom();e.big.src=photo.image_url;e.big.alt=photo.caption||'写真 '+(idx+1);e.counter.textContent=(idx+1)+' / '+(active?.count||photos.length);e.prev.disabled=idx<=0;e.next.disabled=idx>=photos.length-1&&!more}
+function stopVideo(){
+ if(!e.bigVideo.hasAttribute('src'))return;
+ try{e.bigVideo.pause()}catch{}
+ e.bigVideo.removeAttribute('src');
+ e.bigVideo.removeAttribute('poster');
+}
+function paint(){
+ const media=photos[idx];if(!media)return;resetZoom();stopVideo();
+ const video=media.kind==='video';
+ e.big.style.display=video?'none':'block';e.bigVideo.style.display=video?'block':'none';
+ if(video){e.big.removeAttribute('src');e.bigVideo.src=media.image_url;if(media.thumb_url)e.bigVideo.poster=media.thumb_url;e.viewerHint.textContent='再生ボタンで動画を再生 ・ 左右の矢印で移動'}
+ else{e.big.src=media.image_url;e.big.alt=media.caption||'写真 '+(idx+1);e.viewerHint.textContent='左右スワイプで移動 ・ ピンチ / ダブルタップで拡大'}
+ e.counter.textContent=(idx+1)+' / '+(active?.count||photos.length);
+ e.prev.disabled=idx<=0;e.next.disabled=idx>=photos.length-1&&!more;
+}
 async function goNext(){const version=photoVersion;if(idx>=photos.length-1&&more)await nextPage();if(version===photoVersion&&e.viewer.classList.contains('show')&&idx<photos.length-1){idx++;paint()}}
 function goPrev(){if(idx>0){idx--;paint()}}
-function closeViewer(){const wasOpen=e.viewer.classList.contains('show');e.viewer.classList.remove('show');e.viewer.setAttribute('aria-hidden','true');document.body.classList.remove('viewerOpen');resetZoom();if(wasOpen&&lastFocus?.isConnected)lastFocus.focus()}
+function closeViewer(){const wasOpen=e.viewer.classList.contains('show');e.viewer.classList.remove('show');e.viewer.setAttribute('aria-hidden','true');document.body.classList.remove('viewerOpen');stopVideo();resetZoom();if(wasOpen&&lastFocus?.isConnected)lastFocus.focus()}
 e.close.onclick=closeViewer;e.next.onclick=goNext;e.prev.onclick=goPrev;
-let scale=1,x=0,y=0,startX=0,startY=0,pinch=0,pinchScale=1,moved=false,lastTap=0;function dist(a,b){return Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY)}function apply(no=true){e.canvas.style.transition=no?'none':'transform .18s ease';e.canvas.style.transform=`translate(${x}px,${y}px) scale(${scale})`}function resetZoom(){scale=1;x=0;y=0;apply(false)}e.stage.addEventListener('touchstart',ev=>{moved=false;if(ev.touches.length===2){pinch=dist(ev.touches[0],ev.touches[1]);pinchScale=scale}else if(ev.touches.length===1){startX=ev.touches[0].clientX;startY=ev.touches[0].clientY}},{passive:false});e.stage.addEventListener('touchmove',ev=>{ev.preventDefault();moved=true;if(ev.touches.length===2){scale=Math.min(4,Math.max(1,pinchScale*(dist(ev.touches[0],ev.touches[1])/pinch)));apply(true)}else if(ev.touches.length===1&&scale>1){const dx=ev.touches[0].clientX-startX,dy=ev.touches[0].clientY-startY;x+=dx;y+=dy;startX=ev.touches[0].clientX;startY=ev.touches[0].clientY;apply(true)}},{passive:false});e.stage.addEventListener('touchend',ev=>{if(ev.touches.length)return;const now=Date.now();if(!moved&&now-lastTap<280){if(scale>1)resetZoom();else{scale=2;x=0;y=0;apply(false)}lastTap=0;return}if(!moved)lastTap=now;if(scale<=1.02){resetZoom();const t=ev.changedTouches?.[0];if(t){const dx=t.clientX-startX,dy=t.clientY-startY;if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy))(dx<0?goNext():goPrev())}}});
+let scale=1,x=0,y=0,startX=0,startY=0,pinch=0,pinchScale=1,moved=false,lastTap=0;function dist(a,b){return Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY)}function apply(no=true){e.canvas.style.transition=no?'none':'transform .18s ease';e.canvas.style.transform=`translate(${x}px,${y}px) scale(${scale})`}function resetZoom(){scale=1;x=0;y=0;apply(false)}e.stage.addEventListener('touchstart',ev=>{if(ev.target.closest?.('video'))return;moved=false;if(ev.touches.length===2){pinch=dist(ev.touches[0],ev.touches[1]);pinchScale=scale}else if(ev.touches.length===1){startX=ev.touches[0].clientX;startY=ev.touches[0].clientY}},{passive:false});e.stage.addEventListener('touchmove',ev=>{if(ev.target.closest?.('video'))return;ev.preventDefault();moved=true;if(ev.touches.length===2){scale=Math.min(4,Math.max(1,pinchScale*(dist(ev.touches[0],ev.touches[1])/pinch)));apply(true)}else if(ev.touches.length===1&&scale>1){const dx=ev.touches[0].clientX-startX,dy=ev.touches[0].clientY-startY;x+=dx;y+=dy;startX=ev.touches[0].clientX;startY=ev.touches[0].clientY;apply(true)}},{passive:false});e.stage.addEventListener('touchend',ev=>{if(ev.target.closest?.('video'))return;if(ev.touches.length)return;const now=Date.now();if(!moved&&now-lastTap<280){if(scale>1)resetZoom();else{scale=2;x=0;y=0;apply(false)}lastTap=0;return}if(!moved)lastTap=now;if(scale<=1.02){resetZoom();const t=ev.changedTouches?.[0];if(t){const dx=t.clientX-startX,dy=t.clientY-startY;if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy))(dx<0?goNext():goPrev())}}});
 addEventListener('keydown',ev=>{
   if(!e.viewer.classList.contains('show'))return;
   if(ev.key==='Escape')closeViewer();
