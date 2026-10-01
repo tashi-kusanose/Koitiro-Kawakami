@@ -48,6 +48,7 @@ body.booting{overflow:hidden}body.booting .page{visibility:hidden}
 .nav:disabled{opacity:.3;cursor:default}.big{max-height:88dvh}.viewerHint{pointer-events:none}
 #loadMore{display:block;margin:0 auto 20px}.tile:focus-visible,.yearCard:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
 @media(max-width:559px){.nav{display:block;top:auto;bottom:62px;width:36px;height:36px;font-size:24px}}
+.tile.videoTile{position:relative;background:#191919;overflow:hidden}.tile.videoTile .playIcon{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:45px;height:45px;display:grid;place-items:center;border-radius:50%;background:#000b;color:white;font-size:20px;padding-left:3px;border:1px solid #fff9}.tile.videoTile .videoLabel{position:absolute;top:6px;left:6px;border-radius:6px;padding:3px 6px;color:#fff;background:#000a;font-size:10px;font-weight:800}.tile.videoTile .videoBlank{display:block;width:100%;aspect-ratio:4/5;background:linear-gradient(150deg,#292929,#111)}.bigVideo{max-width:96vw;max-height:80vh;background:#000;object-fit:contain;touch-action:auto}
 </style>
 </head>
 <body class="booting">
@@ -61,8 +62,8 @@ body.booting{overflow:hidden}body.booting .page{visibility:hidden}
 </section>
 <section id="detailView" class="hidden">
   <div class="detailTop"><button id="back" class="back">‹ 年一覧</button><span id="detailBrand" class="brand">アルバム</span></div>
-  <section class="detailHero"><div class="kicker">YEAR ALBUM</div><h1 id="detailYear" class="detailYear"></h1><p class="detailDesc">この年の写真をまとめています。<br>写真をタップすると大きく表示できます。</p><div class="summary"><div class="sum"><b id="detailCount">0</b><span>写真</span></div><div class="sum"><b id="detailYearSmall">—</b><span>対象年</span></div></div></section>
-  <div class="photoHead"><h2>写真一覧</h2><span>写真をタップ</span></div><div id="photos" class="masonry"></div><div id="more" class="more"></div><button id="loadMore" class="pill hidden" type="button">さらに写真を読み込む</button>
+  <section class="detailHero"><div class="kicker">YEAR ALBUM</div><h1 id="detailYear" class="detailYear"></h1><p class="detailDesc">この年の写真と動画をまとめています。<br>タップすると大きく表示・再生できます。</p><div class="summary"><div class="sum"><b id="detailCount">0</b><span>写真・動画</span></div><div class="sum"><b id="detailYearSmall">—</b><span>対象年</span></div></div></section>
+  <div class="photoHead"><h2>写真・動画一覧</h2><span>タップして表示・再生</span></div><div id="photos" class="masonry"></div><div id="more" class="more"></div><button id="loadMore" class="pill hidden" type="button">さらに写真を読み込む</button>
 </section>
 </main>
 
@@ -73,8 +74,8 @@ body.booting{overflow:hidden}body.booting .page{visibility:hidden}
   <div id="expandPhoto" class="expandPhoto"></div><div class="finalCopy"><div class="main">思い出</div></div><div class="whiteFlash"></div>
 </section>
 
-<section id="viewer" class="viewer" role="dialog" aria-modal="true" aria-label="写真ビューア" aria-hidden="true"><div class="viewerTop"><div id="counter" class="counter"></div><button id="close" class="close" aria-label="写真を閉じる">×</button></div><button id="prev" class="nav prev" aria-label="前の写真">‹</button><button id="next" class="nav next" aria-label="次の写真">›</button><div id="stage" class="stage"><div id="canvas" class="canvas"><img id="big" class="big" alt=""></div></div><div class="viewerHint">左右スワイプで移動 ・ ピンチ / ダブルタップで拡大</div></section>
+<section id="viewer" class="viewer" role="dialog" aria-modal="true" aria-label="写真ビューア" aria-hidden="true"><div class="viewerTop"><div id="counter" class="counter"></div><button id="close" class="close" aria-label="写真を閉じる">×</button></div><button id="prev" class="nav prev" aria-label="前の写真">‹</button><button id="next" class="nav next" aria-label="次の写真">›</button><div id="stage" class="stage"><div id="canvas" class="canvas"><img id="big" class="big" alt=""><video id="bigVideo" class="big bigVideo" controls playsinline preload="metadata" style="display:none"></video></div></div><div id="viewerHint" class="viewerHint">左右スワイプで移動 ・ ピンチ / ダブルタップで拡大</div></section>
 <div id="toast" class="toast hidden"></div>
-<script type="module" src="index.js?v=20260930-4"></script>
+<script type="module" src="index.js?v=20261002-1"></script>
 </body>
 </html>
