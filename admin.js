@@ -1,13 +1,14 @@
 import {introEnabled, introPhotoMode, pageSettings, applyAppearance, DEFAULT_COLORS} from './album-settings.js?v=20260930-3';
 import{createClient}from'https://esm.sh/@supabase/supabase-js@2.117.2';
-const sb=createClient('https://esfgrykcvdctnvdqipbj.supabase.co','sb_publishable_Rwb3qaRXdWZoo05LrbFaDg_29tMI7uI'),bucket='photo-album',maxPhotos=1500,$=s=>document.querySelector(s);
-const e={siteEyebrow:$('#siteEyebrow'),siteHeaderText:$('#siteHeaderText'),siteIntro:$('#siteIntro'),titleFont:$('#titleFont'),titleSize:$('#titleSize'),introFinalText:$('#introFinalText'),saveSite:$('#saveSite'),saveStatus:$('#saveStatus'),adminStatus:$('#adminStatus'),cBg:$('#cBg'),cSurface:$('#cSurface'),cText:$('#cText'),cMuted:$('#cMuted'),cAccent:$('#cAccent'),cHeader:$('#cHeader'),presetGrid:$('#presetGrid'),auth:$('#auth'),admin:$('#admin'),logout:$('#logout'),logoutMobile:$('#logoutMobile'),login:$('#login'),email:$('#email'),pass:$('#password'),magic:$('#magic'),newAlbum:$('#newAlbum'),navNew:$('#navNew'),navSettings:$('#navSettings'),navAlbums:$('#navAlbums'),list:$('#albumList'),qCount:$('#qCount'),qBytes:$('#qBytes'),qBar:$('#qBar'),settingsToggle:$('#settingsToggle'),settingsPanel:$('#settingsPanel'),siteForm:$('#siteForm'),siteTitle:$('#siteTitle'),introEnabled:$('#introEnabled'),sitePublished:$('#sitePublished'),previewLink:$('#previewLink'),introSelected:$('#introSelected'),picker:$('#photoPicker'),pickerMore:$('#pickerMore'),pickCount:$('#pickCount'),editor:$('#editor'),editorTitle:$('#editorTitle'),close:$('#closeEditor'),form:$('#albumForm'),groupKey:$('#groupKey'),year:$('#aYear'),pub:$('#aPub'),del:$('#deleteAlbum'),upload:$('#uploadBox'),files:$('#files'),progress:$('#progress'),pBar:$('#progressBar'),pText:$('#progressText'),photos:$('#photoGrid'),toast:$('#toast')};
-let user=null,site=null,albums=[],groups=[],currentGroup=null,currentAlbum=null,usage={count:0,bytes:0},introSelected=[],pickerPhotos=[],pickerPage=0,pickerMore=true;
+import * as tus from 'https://esm.sh/tus-js-client@4.3.1';
+const sb=createClient('https://esfgrykcvdctnvdqipbj.supabase.co','sb_publishable_Rwb3qaRXdWZoo05LrbFaDg_29tMI7uI'),bucket='photo-album',videoBucket='photo-album-videos',maxVideoBytes=30*1024*1024,maxPhotos=1500,$=s=>document.querySelector(s);
+const e={siteEyebrow:$('#siteEyebrow'),siteHeaderText:$('#siteHeaderText'),siteIntro:$('#siteIntro'),titleFont:$('#titleFont'),titleSize:$('#titleSize'),introFinalText:$('#introFinalText'),saveSite:$('#saveSite'),saveStatus:$('#saveStatus'),adminStatus:$('#adminStatus'),cBg:$('#cBg'),cSurface:$('#cSurface'),cText:$('#cText'),cMuted:$('#cMuted'),cAccent:$('#cAccent'),cHeader:$('#cHeader'),presetGrid:$('#presetGrid'),auth:$('#auth'),admin:$('#admin'),logout:$('#logout'),logoutMobile:$('#logoutMobile'),login:$('#login'),email:$('#email'),pass:$('#password'),magic:$('#magic'),newAlbum:$('#newAlbum'),navNew:$('#navNew'),navSettings:$('#navSettings'),navAlbums:$('#navAlbums'),list:$('#albumList'),qCount:$('#qCount'),qBytes:$('#qBytes'),qVideos:$('#qVideos'),qBar:$('#qBar'),settingsToggle:$('#settingsToggle'),settingsPanel:$('#settingsPanel'),siteForm:$('#siteForm'),siteTitle:$('#siteTitle'),introEnabled:$('#introEnabled'),sitePublished:$('#sitePublished'),previewLink:$('#previewLink'),introSelected:$('#introSelected'),picker:$('#photoPicker'),pickerMore:$('#pickerMore'),pickCount:$('#pickCount'),editor:$('#editor'),editorTitle:$('#editorTitle'),close:$('#closeEditor'),form:$('#albumForm'),groupKey:$('#groupKey'),year:$('#aYear'),pub:$('#aPub'),del:$('#deleteAlbum'),upload:$('#uploadBox'),files:$('#files'),videoFiles:$('#videoFiles'),progress:$('#progress'),pBar:$('#progressBar'),pText:$('#progressText'),photos:$('#photoGrid'),toast:$('#toast')};
+let user=null,site=null,albums=[],groups=[],currentGroup=null,currentAlbum=null,albumVideoCounts=new Map(),videoUsage={count:0,bytes:0},usage={count:0,bytes:0},introSelected=[],pickerPhotos=[],pickerPage=0,pickerMore=true;
 let initializedUser=null,savingSite=false,settingsDirty=false,pickerLoading=false,pickerVersion=0,editorVersion=0,uploading=false;
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])),url=p=>p?sb.storage.from(bucket).getPublicUrl(p).data.publicUrl:'';
 function toast(m){e.toast.textContent=m;e.toast.classList.remove('hidden');clearTimeout(toast.t);toast.t=setTimeout(()=>e.toast.classList.add('hidden'),3400)}function bytes(n){return n<1048576?(n/1024).toFixed(n?1:0)+' KB':(n/1048576).toFixed(1)+' MB'}
 function yearOf(a){if(a.album_date&&/^\d{4}/.test(a.album_date))return a.album_date.slice(0,4);const m=String(a.title||'').match(/(?:19|20)\d{2}/);return m?m[0]:null}
-function groupAlbums(){const map=new Map();albums.forEach(a=>{const y=yearOf(a)||'年未設定';if(!map.has(y))map.set(y,{key:y,year:y,albums:[],count:0,cover:'',published:false});const g=map.get(y);g.albums.push(a);g.count+=Number(a.photos?.[0]?.count||0);if(!g.cover&&a.cover_path)g.cover=a.cover_path;if(a.is_published)g.published=true});groups=[...map.values()].sort((a,b)=>{if(a.year==='年未設定')return 1;if(b.year==='年未設定')return-1;return Number(b.year)-Number(a.year)})}
+function groupAlbums(){const map=new Map();albums.forEach(a=>{const y=yearOf(a)||'年未設定';if(!map.has(y))map.set(y,{key:y,year:y,albums:[],count:0,cover:'',published:false});const g=map.get(y);g.albums.push(a);g.count+=Number(a.photos?.[0]?.count||0);g.videoCount=(g.videoCount||0)+(albumVideoCounts.get(a.id)||0);if(!g.cover&&a.cover_path)g.cover=a.cover_path;if(a.is_published)g.published=true});groups=[...map.values()].sort((a,b)=>{if(a.year==='年未設定')return 1;if(b.year==='年未設定')return-1;return Number(b.year)-Number(a.year)})}
 function authChanged(session){
   user=session?.user||null;
   e.auth.classList.toggle('hidden',!!user);e.admin.classList.toggle('hidden',!user);
@@ -94,8 +95,8 @@ async function saveSite(event){
   }catch(error){e.saveStatus.textContent='保存できませんでした。変更内容はこの画面に残っています。';toast(error.message)}
   finally{savingSite=false;setSettingsBusy(false);e.saveSite.textContent='設定を保存'}
 }
-async function loadAlbums(){const{data,error}=await sb.from('photo_albums').select('id,title,description,album_date,is_published,cover_path,created_at,site_id,photos:photo_album_photos(count)').eq('site_id',site.id).order('album_date',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false}).order('id');if(error)return toast(error.message);albums=data||[];groupAlbums();renderList();await loadUsage()}
-function renderList(){e.list.innerHTML=groups.length?groups.map(g=>`<article class="row" data-key="${esc(g.key)}"><div class="thumb">${g.cover?`<img src="${esc(url(g.cover))}" alt="">`:''}</div><div><h3>${esc(g.year)} <span class="status ${g.published?'':'off'}">${g.published?'公開中':'非公開'}</span></h3><p>${g.count}枚 · ${g.albums.length}データ</p></div><div class="rowActions"><button class="outline editRow" type="button">編集</button><button class="danger deleteRow" type="button">削除</button></div></article>`).join(''):'<div class="empty">年別アルバムはまだありません。</div>';e.list.querySelectorAll('.editRow').forEach(b=>b.onclick=ev=>{ev.stopPropagation();editGroup(b.closest('.row').dataset.key)});e.list.querySelectorAll('.deleteRow').forEach(b=>b.onclick=ev=>{ev.stopPropagation();removeGroup(b.closest('.row').dataset.key)});e.list.querySelectorAll('.row').forEach(x=>x.onclick=()=>editGroup(x.dataset.key))}
+async function loadAlbums(){const{data,error}=await sb.from('photo_albums').select('id,title,description,album_date,is_published,cover_path,created_at,site_id,photos:photo_album_photos(count)').eq('site_id',site.id).order('album_date',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false}).order('id');if(error)return toast(error.message);albums=data||[];const videoStats=await allPhotos(()=>sb.from('photo_album_videos').select('album_id,video_bytes').eq('owner_user_id',user.id).order('id'));albumVideoCounts=new Map();videoStats.forEach(video=>albumVideoCounts.set(video.album_id,(albumVideoCounts.get(video.album_id)||0)+1));videoUsage={count:videoStats.length,bytes:videoStats.reduce((total,video)=>total+Number(video.video_bytes||0),0)};groupAlbums();renderList();await loadUsage()}
+function renderList(){e.list.innerHTML=groups.length?groups.map(g=>`<article class="row" data-key="${esc(g.key)}"><div class="thumb">${g.cover?`<img src="${esc(url(g.cover))}" alt="">`:''}</div><div><h3>${esc(g.year)} <span class="status ${g.published?'':'off'}">${g.published?'公開中':'非公開'}</span></h3><p>${g.count}枚 · 動画${g.videoCount||0}本 · ${g.albums.length}データ</p></div><div class="rowActions"><button class="outline editRow" type="button">編集</button><button class="danger deleteRow" type="button">削除</button></div></article>`).join(''):'<div class="empty">年別アルバムはまだありません。</div>';e.list.querySelectorAll('.editRow').forEach(b=>b.onclick=ev=>{ev.stopPropagation();editGroup(b.closest('.row').dataset.key)});e.list.querySelectorAll('.deleteRow').forEach(b=>b.onclick=ev=>{ev.stopPropagation();removeGroup(b.closest('.row').dataset.key)});e.list.querySelectorAll('.row').forEach(x=>x.onclick=()=>editGroup(x.dataset.key))}
 async function allPhotos(makeQuery){
   const collected=[],size=500;
   for(let offset=0;;offset+=size){const {data,error}=await makeQuery().range(offset,offset+size-1);if(error)throw error;collected.push(...(data||[]));if((data||[]).length<size)return collected}
@@ -103,24 +104,104 @@ async function allPhotos(makeQuery){
 async function loadUsage(){
   const data=await allPhotos(()=>sb.from('photo_album_photos').select('image_bytes,thumb_bytes').eq('owner_user_id',user.id).order('id'));
   usage={count:data.length,bytes:data.reduce((sum,photo)=>sum+(photo.image_bytes||0)+(photo.thumb_bytes||0),0)};
-  e.qCount.textContent=usage.count+' / '+maxPhotos+'枚';e.qBytes.textContent='推定 '+bytes(usage.bytes)+' / 1 GB';e.qBar.style.width=Math.min(100,Math.round(usage.count/maxPhotos*100))+'%';
+  e.qCount.textContent=usage.count+' / '+maxPhotos+'枚';e.qBytes.textContent='推定 '+bytes(usage.bytes)+' / 1 GB';e.qBar.style.width=Math.min(100,Math.round(usage.count/maxPhotos*100))+'%';e.qVideos.textContent='動画 '+videoUsage.count+'本 / '+bytes(videoUsage.bytes)+'（1本30MBまで）';
 }
 function fresh(){if(uploading)return toast('写真のアップロード完了をお待ちください');if(!site)return;editorVersion++;currentGroup=null;currentAlbum=null;e.form.reset();e.groupKey.value='';e.year.value=new Date().getFullYear();e.pub.checked=true;e.del.classList.add('hidden');e.upload.classList.add('hidden');e.photos.innerHTML='';e.editorTitle.textContent='新しい年を追加';e.editor.classList.remove('hidden');e.editor.scrollIntoView({behavior:'smooth'})}
 async function editGroup(key){if(uploading)return toast('写真のアップロード完了をお待ちください');currentGroup=groups.find(g=>g.key===key);if(!currentGroup)return;currentAlbum=currentGroup.albums[0];e.groupKey.value=key;e.year.value=currentGroup.year==='年未設定'?'':currentGroup.year;e.pub.checked=currentGroup.published;e.del.classList.remove('hidden');e.upload.classList.remove('hidden');e.editorTitle.textContent=currentGroup.year+'年の写真';e.editor.classList.remove('hidden');await loadPhotos();e.editor.scrollIntoView({behavior:'smooth'})}
 async function saveGroup(ev){ev.preventDefault();if(uploading||!site)return;const year=String(e.year.value).trim();if(!/^(19|20)\d{2}$/.test(year))return toast('4桁の年を入力してください');if(!currentGroup){const r=await sb.from('photo_albums').insert({title:year+'年',album_date:year+'-01-01',is_published:e.pub.checked,owner_user_id:user.id,site_id:site.id,description:''}).select().single();if(r.error)return toast(r.error.message);toast(year+'年を追加しました');await loadAlbums();await editGroup(year);return}const ids=currentGroup.albums.map(a=>a.id);const r=await sb.from('photo_albums').update({title:year+'年',album_date:year+'-01-01',is_published:e.pub.checked}).in('id',ids).eq('owner_user_id',user.id);if(r.error)return toast(r.error.message);toast('保存しました');await loadAlbums();await editGroup(year)}
 async function loadPhotos(){
   if(!currentGroup)return;const version=++editorVersion,ids=currentGroup.albums.map(album=>album.id),cover=currentGroup.cover;
-  e.photos.innerHTML='<p class="mut">写真を読み込んでいます…</p>';
+  e.photos.innerHTML='<p class="mut">写真・動画を読み込んでいます…</p>';
   try{
-    const data=await allPhotos(()=>sb.from('photo_album_photos').select('*').in('album_id',ids).order('album_id').order('position').order('id'));
+    const [data,videos]=await Promise.all([allPhotos(()=>sb.from('photo_album_photos').select('*').in('album_id',ids).order('album_id').order('position').order('id')),allPhotos(()=>sb.from('photo_album_videos').select('*').in('album_id',ids).order('created_at',{ascending:false}).order('id'))]);
     if(version!==editorVersion)return;
-    e.photos.innerHTML=data.map(photo=>`<div class="photo"><img loading="lazy" src="${esc(url(photo.thumb_path||photo.image_path))}" alt=""><button class="deletePhoto" aria-label="写真を削除" data-id="${esc(photo.id)}" data-i="${esc(photo.image_path)}" data-t="${esc(photo.thumb_path)}" data-a="${esc(photo.album_id)}">×</button><button class="coverBtn ${cover===photo.thumb_path?'current':''}" data-cover="${esc(photo.thumb_path)}" type="button">${cover===photo.thumb_path?'現在の表紙':'表紙にする'}</button></div>`).join('');
-    e.photos.querySelectorAll('.deletePhoto').forEach(button=>button.onclick=()=>removePhoto(button));e.photos.querySelectorAll('.coverBtn').forEach(button=>button.onclick=()=>setCover(button.dataset.cover));
+    e.photos.innerHTML=videos.map(video=>`<div class="photo videoTile">${video.thumb_path?`<img loading="lazy" src="${esc(url(video.thumb_path))}" alt="動画">`:'<div class="videoFallback">▶</div>'}<span class="videoTag">▶ 動画</span><button class="deletePhoto deleteVideo" aria-label="動画を削除" data-id="${esc(video.id)}" data-v="${esc(video.video_path)}" data-t="${esc(video.thumb_path||'')}">×</button>${video.thumb_path?`<button class="coverBtn ${cover===video.thumb_path?'current':''}" data-cover="${esc(video.thumb_path)}" type="button">${cover===video.thumb_path?'現在の表紙':'表紙にする'}</button>`:''}</div>`).join('')+data.map(photo=>`<div class="photo"><img loading="lazy" src="${esc(url(photo.thumb_path||photo.image_path))}" alt=""><button class="deletePhoto" aria-label="写真を削除" data-id="${esc(photo.id)}" data-i="${esc(photo.image_path)}" data-t="${esc(photo.thumb_path)}" data-a="${esc(photo.album_id)}">×</button><button class="coverBtn ${cover===photo.thumb_path?'current':''}" data-cover="${esc(photo.thumb_path)}" type="button">${cover===photo.thumb_path?'現在の表紙':'表紙にする'}</button></div>`).join('');
+    e.photos.querySelectorAll('.deletePhoto:not(.deleteVideo)').forEach(button=>button.onclick=()=>removePhoto(button));e.photos.querySelectorAll('.deleteVideo').forEach(button=>button.onclick=()=>removeVideo(button));e.photos.querySelectorAll('.coverBtn').forEach(button=>button.onclick=()=>setCover(button.dataset.cover));
   }catch(error){if(version===editorVersion){e.photos.innerHTML='<p class="mut">写真を読み込めませんでした。もう一度「編集」を押してください。</p>';toast(error.message)}}
 }
 async function setCover(thumbPath){if(!currentGroup)return;const primary=currentGroup.albums[0];const r=await sb.from('photo_albums').update({cover_path:thumbPath}).in('id',currentGroup.albums.map(album=>album.id)).eq('owner_user_id',user.id);if(r.error)return toast(r.error.message);toast('年の表紙を変更しました');await loadAlbums();await editGroup(yearOf({...primary,album_date:e.year.value+'-01-01'})||currentGroup.key)}
+async function removeVideo(button){
+ if(uploading||savingSite)return;
+ if(!confirm('この動画を削除しますか？'))return;
+ const path=button.dataset.v,thumb=button.dataset.t;
+ let r=await sb.storage.from(videoBucket).remove([path]);if(r.error)return toast(r.error.message);
+ if(thumb){r=await sb.storage.from(bucket).remove([thumb]);if(r.error)console.warn('動画サムネイルの削除に失敗:',r.error)}
+ r=await sb.from('photo_album_videos').delete().eq('id',button.dataset.id).eq('owner_user_id',user.id);
+ if(r.error)return toast(r.error.message);
+ if(thumb){r=await sb.from('photo_albums').update({cover_path:null}).eq('site_id',site.id).eq('owner_user_id',user.id).eq('cover_path',thumb);if(r.error)toast('動画を削除しました。表紙は管理画面で確認してください。')}
+ await loadAlbums();const key=currentGroup?.key;if(key&&groups.some(g=>g.key===key))await editGroup(key);toast('動画を削除しました');
+}
 async function removePhoto(b){if(uploading||savingSite)return;if(!confirm('この写真を削除しますか？'))return;let r=await sb.storage.from(bucket).remove([b.dataset.i,b.dataset.t]);if(r.error)return toast(r.error.message);r=await sb.from('photo_album_photos').delete().eq('id',b.dataset.id).eq('owner_user_id',user.id);if(r.error)return toast(r.error.message);const coverResult=await sb.from('photo_albums').update({cover_path:null}).eq('site_id',site.id).eq('owner_user_id',user.id).eq('cover_path',b.dataset.t);if(coverResult.error)toast('表紙を更新できませんでした。別の表紙を選んでください。');introSelected=introSelected.filter(x=>x.id!==b.dataset.id&&x.image_path!==b.dataset.i);await removeSavedIntroPhotos(new Set([b.dataset.id,b.dataset.i]));renderIntroSelected();await loadAlbums();await loadPicker(true);const key=currentGroup?.key;if(key&&groups.find(g=>g.key===key))await editGroup(key);toast('写真を削除しました')}
-async function removeGroup(key){if(uploading||savingSite)return;const g=groups.find(x=>x.key===key);if(!g||!confirm('「'+g.year+'」の写真をすべて削除しますか？'))return;const ids=g.albums.map(a=>a.id);let data;try{data=await allPhotos(()=>sb.from('photo_album_photos').select('id,image_path,thumb_path').in('album_id',ids).order('id'))}catch(error){return toast(error.message)}const paths=(data||[]).flatMap(p=>[p.image_path,p.thumb_path]);for(let i=0;i<paths.length;i+=100){const r=await sb.storage.from(bucket).remove(paths.slice(i,i+100));if(r.error)return toast(r.error.message)}const r=await sb.from('photo_albums').delete().in('id',ids).eq('owner_user_id',user.id);if(r.error)return toast(r.error.message);const deleted=new Set((data||[]).map(p=>p.id));introSelected=introSelected.filter(x=>!deleted.has(x.id));await removeSavedIntroPhotos(new Set([...deleted,...(data||[]).map(p=>p.image_path)]));renderIntroSelected();if(currentGroup?.key===key){currentGroup=null;currentAlbum=null;e.editor.classList.add('hidden')}await loadAlbums();await loadPicker(true);toast('削除しました')}
+async function removeGroup(key){if(uploading||savingSite)return;const g=groups.find(x=>x.key===key);if(!g||!confirm('「'+g.year+'」の写真をすべて削除しますか？'))return;const ids=g.albums.map(a=>a.id);let data;try{data=await allPhotos(()=>sb.from('photo_album_photos').select('id,image_path,thumb_path').in('album_id',ids).order('id'))}catch(error){return toast(error.message)}const videos=await allPhotos(()=>sb.from('photo_album_videos').select('video_path,thumb_path').in('album_id',ids).order('id'));const videoPaths=videos.map(v=>v.video_path);for(let i=0;i<videoPaths.length;i+=100){const r=await sb.storage.from(videoBucket).remove(videoPaths.slice(i,i+100));if(r.error)return toast(r.error.message)}const videoThumbs=videos.map(v=>v.thumb_path).filter(Boolean);for(let i=0;i<videoThumbs.length;i+=100){const r=await sb.storage.from(bucket).remove(videoThumbs.slice(i,i+100));if(r.error)return toast(r.error.message)}const paths=(data||[]).flatMap(p=>[p.image_path,p.thumb_path]);for(let i=0;i<paths.length;i+=100){const r=await sb.storage.from(bucket).remove(paths.slice(i,i+100));if(r.error)return toast(r.error.message)}const r=await sb.from('photo_albums').delete().in('id',ids).eq('owner_user_id',user.id);if(r.error)return toast(r.error.message);const deleted=new Set((data||[]).map(p=>p.id));introSelected=introSelected.filter(x=>!deleted.has(x.id));await removeSavedIntroPhotos(new Set([...deleted,...(data||[]).map(p=>p.image_path)]));renderIntroSelected();if(currentGroup?.key===key){currentGroup=null;currentAlbum=null;e.editor.classList.add('hidden')}await loadAlbums();await loadPicker(true);toast('削除しました')}
+function videoMime(file){const ext=String(file.name||'').toLowerCase().split('.').pop();if(ext==='mp4'&&(file.type==='video/mp4'||!file.type))return 'video/mp4';if(ext==='webm'&&(file.type==='video/webm'||!file.type))return 'video/webm';if(ext==='mov'&&(file.type==='video/quicktime'||!file.type))return 'video/quicktime';return '';}
+async function videoThumbnail(file){
+ const node=document.createElement('video'),objectUrl=URL.createObjectURL(file);
+ node.muted=true;node.playsInline=true;node.preload='auto';
+ try{
+  await new Promise((resolve,reject)=>{
+   let settled=false;const done=error=>{if(settled)return;settled=true;clearTimeout(timer);node.onloadeddata=null;node.onerror=null;error?reject(error):resolve()};
+   const timer=setTimeout(()=>done(new Error('サムネイル取得タイムアウト')),8000);
+   node.onloadeddata=()=>done();node.onerror=()=>done(new Error('動画をプレビューできません'));
+   node.src=objectUrl;node.load();
+  });
+  const max=420,ratio=Math.min(1,max/Math.max(node.videoWidth,node.videoHeight));
+  if(!Number.isFinite(ratio)||!node.videoWidth||!node.videoHeight)return null;
+  const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(node.videoWidth*ratio));canvas.height=Math.max(1,Math.round(node.videoHeight*ratio));
+  canvas.getContext('2d').drawImage(node,0,0,canvas.width,canvas.height);
+  for(const quality of [.7,.5,.3]){
+   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',quality));
+   if(blob&&blob.size<=50*1024)return blob;
+  }
+  return null;
+ }finally{node.pause();node.removeAttribute('src');node.load();URL.revokeObjectURL(objectUrl)}
+}
+async function sendVideo(path,file,mime,onProgress){
+ const {data:{session},error}=await sb.auth.getSession();if(error||!session?.access_token)throw new Error('ログインし直してください');
+ if(file.size<=6*1024*1024){
+   const result=await sb.storage.from(videoBucket).upload(path,file,{contentType:mime,cacheControl:'3600'});
+   if(result.error)throw result.error;onProgress(1);return;
+ }
+ await new Promise((resolve,reject)=>{
+  const task=new tus.Upload(file,{endpoint:'https://esfgrykcvdctnvdqipbj.storage.supabase.co/storage/v1/upload/resumable',
+   retryDelays:[0,3000,5000,10000,20000],headers:{authorization:'Bearer '+session.access_token,apikey:'sb_publishable_Rwb3qaRXdWZoo05LrbFaDg_29tMI7uI'},
+   uploadDataDuringCreation:true,removeFingerprintOnSuccess:true,chunkSize:6*1024*1024,
+   metadata:{bucketName:videoBucket,objectName:path,contentType:mime,cacheControl:'3600'},
+   onError:reject,onProgress:(done,total)=>onProgress(total?done/total:0),onSuccess:resolve});
+  task.start();
+ });
+}
+async function uploadVideos(files){
+ if(!currentAlbum||uploading)return;
+ const list=[...files];if(!list.length)return;
+ const targetAlbum={...currentAlbum},ownerId=user.id;uploading=true;e.videoFiles.disabled=true;e.files.disabled=true;
+ try{
+  e.progress.classList.remove('hidden');
+  let ok=0;
+  for(let i=0;i<list.length;i++){
+   const file=list[i],mime=videoMime(file);
+   if(!mime){toast(file.name+': MP4 / WebM / MOVのみ対応');continue}
+   if(!file.size||file.size>maxVideoBytes){toast(file.name+': 動画は1本30MBまでです');continue}
+   const key=crypto.randomUUID(),base=ownerId+'/'+targetAlbum.id,videoPath=base+'/'+key+'.'+(mime==='video/mp4'?'mp4':mime==='video/webm'?'webm':'mov'),thumbPath=base+'/video-thumbs/'+key+'.webp';
+   let videoSaved=false,thumbSaved=false;
+   try{
+    progress(0,1,'動画を準備中: '+file.name);
+    let thumb=null;try{thumb=await videoThumbnail(file)}catch(error){console.warn('サムネイル生成を省略:',error)}
+    await sendVideo(videoPath,file,mime,pct=>{e.pBar.style.width=Math.round(pct*100)+'%';e.pText.textContent=(i+1)+' / '+list.length+' · '+file.name+' · '+Math.round(pct*100)+'%'});videoSaved=true;
+    if(thumb){const result=await sb.storage.from(bucket).upload(thumbPath,thumb,{contentType:'image/webp',cacheControl:'31536000'});if(result.error)console.warn('サムネイル保存を省略:',result.error);else thumbSaved=true}
+    const result=await sb.from('photo_album_videos').insert({album_id:targetAlbum.id,owner_user_id:ownerId,video_path:videoPath,thumb_path:thumbSaved?thumbPath:null,video_bytes:file.size,thumb_bytes:thumbSaved?thumb.size:0,mime_type:mime});
+    if(result.error)throw result.error;ok++;
+   }catch(error){
+    console.error(error);toast(file.name+': '+error.message);
+    if(videoSaved)await sb.storage.from(videoBucket).remove([videoPath]);
+    if(thumbSaved)await sb.storage.from(bucket).remove([thumbPath]);
+   }
+  }
+  progress(list.length,list.length,ok+'本の動画を保存しました');
+  await loadAlbums();
+  uploading=false;const key=yearOf(targetAlbum)||currentGroup?.key;if(key&&groups.some(g=>g.key===key))await editGroup(key);
+  setTimeout(()=>e.progress.classList.add('hidden'),1800);
+ }catch(error){toast(error.message)}finally{uploading=false;e.videoFiles.value='';e.videoFiles.disabled=false;e.files.disabled=false}
+}
 async function upload(files){
   if(!currentAlbum||uploading)return;
   const list=[...files].filter(file=>file.type.startsWith('image/'));if(!list.length)return;
@@ -182,4 +263,4 @@ e.siteForm.addEventListener('change',markDirty);
 $('#introPhotoMode').addEventListener('change',renderIntroPhotoMode);
 addEventListener('beforeunload',event=>{if(settingsDirty||uploading){event.preventDefault();event.returnValue=''}});
 
-e.settingsToggle.onclick=()=>toggleSettings();e.navSettings.onclick=()=>toggleSettings(true);e.siteForm.onsubmit=saveSite;e.pickerMore.onclick=()=>loadPicker(false);e.login.onsubmit=async ev=>{ev.preventDefault();const{error}=await sb.auth.signInWithPassword({email:e.email.value,password:e.pass.value});if(error)toast(error.message)};e.magic.onclick=async()=>{const email=e.email.value.trim();if(!email)return toast('メールアドレスを入力してください');const{error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.href,shouldCreateUser:false}});toast(error?error.message:'ログインリンクを送信しました')};const logout=()=>sb.auth.signOut();e.logout.onclick=logout;e.logoutMobile.onclick=logout;e.newAlbum.onclick=fresh;e.navNew.onclick=fresh;e.navAlbums.onclick=()=>scrollTo({top:0,behavior:'smooth'});e.close.onclick=()=>e.editor.classList.add('hidden');e.form.onsubmit=saveGroup;e.del.onclick=()=>currentGroup&&removeGroup(currentGroup.key);e.files.onchange=v=>upload(v.target.files);['dragenter','dragover'].forEach(n=>e.upload.addEventListener(n,v=>{v.preventDefault();e.upload.classList.add('drag')}));['dragleave','drop'].forEach(n=>e.upload.addEventListener(n,v=>{v.preventDefault();e.upload.classList.remove('drag')}));e.upload.addEventListener('drop',v=>upload(v.dataTransfer.files));init();
+e.settingsToggle.onclick=()=>toggleSettings();e.navSettings.onclick=()=>toggleSettings(true);e.siteForm.onsubmit=saveSite;e.pickerMore.onclick=()=>loadPicker(false);e.login.onsubmit=async ev=>{ev.preventDefault();const{error}=await sb.auth.signInWithPassword({email:e.email.value,password:e.pass.value});if(error)toast(error.message)};e.magic.onclick=async()=>{const email=e.email.value.trim();if(!email)return toast('メールアドレスを入力してください');const{error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.href,shouldCreateUser:false}});toast(error?error.message:'ログインリンクを送信しました')};const logout=()=>sb.auth.signOut();e.logout.onclick=logout;e.logoutMobile.onclick=logout;e.newAlbum.onclick=fresh;e.navNew.onclick=fresh;e.navAlbums.onclick=()=>scrollTo({top:0,behavior:'smooth'});e.close.onclick=()=>e.editor.classList.add('hidden');e.form.onsubmit=saveGroup;e.del.onclick=()=>currentGroup&&removeGroup(currentGroup.key);e.files.onchange=v=>upload(v.target.files);e.videoFiles.onchange=v=>uploadVideos(v.target.files);['dragenter','dragover'].forEach(n=>e.upload.addEventListener(n,v=>{v.preventDefault();e.upload.classList.add('drag')}));['dragleave','drop'].forEach(n=>e.upload.addEventListener(n,v=>{v.preventDefault();e.upload.classList.remove('drag')}));e.upload.addEventListener('drop',v=>{const files=[...v.dataTransfer.files],images=files.filter(f=>f.type.startsWith('image/')),videos=files.filter(f=>videoMime(f));(async()=>{if(images.length)await upload(images);if(videos.length)await uploadVideos(videos);if(!images.length&&!videos.length)toast('写真またはMP4 / WebM / MOVを選択してください')})()});init();
