@@ -206,7 +206,7 @@ function stopVideo(){
 function paint(){
  const media=photos[idx];if(!media)return;resetZoom();stopVideo();
  const video=media.kind==='video';
- e.big.style.display=video?'none':'block';e.bigVideo.style.display=video?'block':'none';
+ e.big.style.display=video?'none':'block';e.bigVideo.style.display=video?'block':'none';e.viewer.style.touchAction=video?'auto':'none';e.stage.style.touchAction=video?'auto':'none';
  if(video){e.big.removeAttribute('src');e.bigVideo.src=media.image_url;if(media.thumb_url)e.bigVideo.poster=media.thumb_url;e.viewerHint.textContent='再生ボタンで動画を再生 ・ 左右の矢印で移動'}
  else{e.big.src=media.image_url;e.big.alt=media.caption||'写真 '+(idx+1);e.viewerHint.textContent='左右スワイプで移動 ・ ピンチ / ダブルタップで拡大'}
  e.counter.textContent=(idx+1)+' / '+(active?.count||photos.length);
@@ -214,7 +214,7 @@ function paint(){
 }
 async function goNext(){const version=photoVersion;if(idx>=photos.length-1&&more)await nextPage();if(version===photoVersion&&e.viewer.classList.contains('show')&&idx<photos.length-1){idx++;paint()}}
 function goPrev(){if(idx>0){idx--;paint()}}
-function closeViewer(){const wasOpen=e.viewer.classList.contains('show');e.viewer.classList.remove('show');e.viewer.setAttribute('aria-hidden','true');document.body.classList.remove('viewerOpen');stopVideo();resetZoom();if(wasOpen&&lastFocus?.isConnected)lastFocus.focus()}
+function closeViewer(){const wasOpen=e.viewer.classList.contains('show');e.viewer.classList.remove('show');e.viewer.setAttribute('aria-hidden','true');document.body.classList.remove('viewerOpen');stopVideo();e.viewer.style.touchAction='none';e.stage.style.touchAction='none';resetZoom();if(wasOpen&&lastFocus?.isConnected)lastFocus.focus()}
 e.close.onclick=closeViewer;e.next.onclick=goNext;e.prev.onclick=goPrev;
 let scale=1,x=0,y=0,startX=0,startY=0,pinch=0,pinchScale=1,moved=false,lastTap=0;function dist(a,b){return Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY)}function apply(no=true){e.canvas.style.transition=no?'none':'transform .18s ease';e.canvas.style.transform=`translate(${x}px,${y}px) scale(${scale})`}function resetZoom(){scale=1;x=0;y=0;apply(false)}e.stage.addEventListener('touchstart',ev=>{if(ev.target.closest?.('video'))return;moved=false;if(ev.touches.length===2){pinch=dist(ev.touches[0],ev.touches[1]);pinchScale=scale}else if(ev.touches.length===1){startX=ev.touches[0].clientX;startY=ev.touches[0].clientY}},{passive:false});e.stage.addEventListener('touchmove',ev=>{if(ev.target.closest?.('video'))return;ev.preventDefault();moved=true;if(ev.touches.length===2){scale=Math.min(4,Math.max(1,pinchScale*(dist(ev.touches[0],ev.touches[1])/pinch)));apply(true)}else if(ev.touches.length===1&&scale>1){const dx=ev.touches[0].clientX-startX,dy=ev.touches[0].clientY-startY;x+=dx;y+=dy;startX=ev.touches[0].clientX;startY=ev.touches[0].clientY;apply(true)}},{passive:false});e.stage.addEventListener('touchend',ev=>{if(ev.target.closest?.('video'))return;if(ev.touches.length)return;const now=Date.now();if(!moved&&now-lastTap<280){if(scale>1)resetZoom();else{scale=2;x=0;y=0;apply(false)}lastTap=0;return}if(!moved)lastTap=now;if(scale<=1.02){resetZoom();const t=ev.changedTouches?.[0];if(t){const dx=t.clientX-startX,dy=t.clientY-startY;if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy))(dx<0?goNext():goPrev())}}});
 addEventListener('keydown',ev=>{
