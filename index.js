@@ -1,5 +1,6 @@
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.117.2';
 import {introEnabled, introPhotoMode, randomIntroPhotos, pageSettings, applyAppearance, uniqueIntroPhotos} from './album-settings.js?v=20260930-3';
+import {albumLabel, compareAlbumLabels, isYearAlbum} from './album-labels.js?v=20261002-4';
 const sb=createClient('https://esfgrykcvdctnvdqipbj.supabase.co','sb_publishable_Rwb3qaRXdWZoo05LrbFaDg_29tMI7uI');
 const bucket='photo-album',videoBucket='photo-album-videos', PAGE=60, $=s=>document.querySelector(s);
 const e={home:$('#homeView'),detail:$('#detailView'),years:$('#years'),yearCount:$('#yearCount'),name:$('#displayName'),back:$('#back'),detailYear:$('#detailYear'),detailYearSmall:$('#detailYearSmall'),detailCount:$('#detailCount'),photos:$('#photos'),more:$('#more'),loadMore:$('#loadMore'),intro:$('#intro'),replay:$('#replay'),viewer:$('#viewer'),counter:$('#counter'),close:$('#close'),prev:$('#prev'),next:$('#next'),stage:$('#stage'),canvas:$('#canvas'),big:$('#big'),bigVideo:$('#bigVideo'),viewerHint:$('#viewerHint'),toast:$('#toast')};
@@ -10,7 +11,6 @@ const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const publicUrl=p=>p?sb.storage.from(bucket).getPublicUrl(p).data.publicUrl:'';
 const videoUrl=p=>p?sb.storage.from(videoBucket).getPublicUrl(p).data.publicUrl:'';
 function toast(message){e.toast.textContent=message;e.toast.classList.remove('hidden');clearTimeout(toast.t);toast.t=setTimeout(()=>e.toast.classList.add('hidden'),4200)}
-function yearOf(a){if(a.album_date&&/^\d{4}/.test(a.album_date))return a.album_date.slice(0,4);const m=String(a.title||'').match(/(?:19|20)\d{2}/);return m?m[0]:null}
 async function loadVideoRows(ids){
  videoRows=[];if(!ids.length)return;
  for(let offset=0;;offset+=500){
@@ -23,8 +23,8 @@ async function loadVideoRows(ids){
 }
 function makeGroups(){
   const map=new Map(),counts=new Map();videoRows.forEach(v=>counts.set(v.album_id,(counts.get(v.album_id)||0)+1));
-  for(const a of albums){const year=yearOf(a)||'年未設定';if(!map.has(year))map.set(year,{year,albums:[],count:0,cover:''});const g=map.get(year);g.albums.push(a);g.count+=Number(a.photo_count||0)+(counts.get(a.id)||0);g.videoCount=(g.videoCount||0)+(counts.get(a.id)||0);if(!g.cover&&a.cover_path)g.cover=a.cover_path}
-  groups=[...map.values()].sort((a,b)=>a.year==='年未設定'?1:b.year==='年未設定'?-1:Number(b.year)-Number(a.year));
+  for(const a of albums){const year=albumLabel(a);if(!map.has(year))map.set(year,{year,albums:[],count:0,cover:''});const g=map.get(year);g.albums.push(a);g.count+=Number(a.photo_count||0)+(counts.get(a.id)||0);g.videoCount=(g.videoCount||0)+(counts.get(a.id)||0);if(!g.cover&&a.cover_path)g.cover=a.cover_path}
+  groups=[...map.values()].sort((a,b)=>compareAlbumLabels(a.year,b.year));
 }
 function text(id,value){const node=$(id);node.textContent=value;node.classList.toggle('hidden',!value)}
 function renderHeader(){
@@ -84,8 +84,8 @@ async function load(){
   }finally{if(version===loadVersion)revealPage()}
 }
 function renderGroups(){
-  e.yearCount.textContent=groups.length+' YEARS';
-  e.years.innerHTML=groups.length?groups.map((g,i)=>`<button class="yearCard" data-year="${esc(g.year)}"><span class="fallback"></span>${g.cover?`<img loading="lazy" src="${esc(publicUrl(g.cover))}" alt="">`:''}<span class="yearShade"></span>${i===0&&g.year!=='年未設定'?'<span class="latest">最新</span>':''}<span class="arrow">›</span><span class="yearInfo"><span class="yearNum">${esc(g.year)}</span><span class="yearMeta">${g.count} 件（動画 ${g.videoCount||0}本）</span></span></button>`).join(''):'<div class="empty">アルバムはまだありません。</div>';
+  e.yearCount.textContent=groups.length+' ALBUMS';
+  e.years.innerHTML=groups.length?groups.map((g,i)=>`<button class="yearCard" data-year="${esc(g.year)}"><span class="fallback"></span>${g.cover?`<img loading="lazy" src="${esc(publicUrl(g.cover))}" alt="">`:''}<span class="yearShade"></span>${i===0&&isYearAlbum(g.year)?'<span class="latest">最新</span>':''}<span class="arrow">›</span><span class="yearInfo"><span class="yearNum${isYearAlbum(g.year)?'':' customTitle'}">${esc(g.year)}</span><span class="yearMeta">${g.count} 件（動画 ${g.videoCount||0}本）</span></span></button>`).join(''):'<div class="empty">アルバムはまだありません。</div>';
   e.years.querySelectorAll('.yearCard').forEach(button=>button.onclick=()=>openYear(button.dataset.year,true));
 }
 function introCovers(){
@@ -160,7 +160,7 @@ e.replay.onclick=startIntro;$('#skip').onclick=finishIntro;
 async function openYear(year,push=true){
   const group=groups.find(g=>g.year===year);if(!group)return;
   hideIntro();closeViewer();photoVersion++;active=group;const ids=new Set(group.albums.map(a=>a.id));photos=videoRows.filter(v=>ids.has(v.album_id)).map(v=>({...v,kind:'video',image_url:videoUrl(v.video_path),thumb_url:publicUrl(v.thumb_path)}));page=0;more=true;loading=false;
-  e.home.classList.add('hidden');e.detail.classList.remove('hidden');e.detailYear.textContent=year;
+  e.home.classList.add('hidden');e.detail.classList.remove('hidden');e.detailYear.textContent=year;e.detailYear.classList.toggle('customTitle',!isYearAlbum(year));
   e.detailYearSmall.textContent=year;e.detailCount.textContent=group.count;e.photos.innerHTML=photos.map((video,i)=>`<button class="tile videoTile" data-i="${i}" aria-label="${esc(video.caption||'動画 '+(i+1))}">${video.thumb_url?`<img loading="lazy" src="${esc(video.thumb_url)}" alt="">`:'<span class="videoBlank"></span>'}<span class="playIcon" aria-hidden="true">▶</span><span class="videoLabel">VIDEO</span></button>`).join('');e.photos.querySelectorAll('.videoTile').forEach(button=>button.onclick=()=>show(Number(button.dataset.i)));e.more.textContent='';e.loadMore.classList.add('hidden');
   if(push){const q=new URLSearchParams(location.search);q.delete('album');q.set('year',year);history.pushState({albumYear:true},'',location.pathname+'?'+q)}
   scrollTo({top:0});await nextPage();
@@ -190,7 +190,7 @@ function home(push=false){
 }
 async function readRoute(){
   closeViewer();const q=new URLSearchParams(location.search);let year=q.get('year');
-  if(!year&&q.get('album')){const album=albums.find(a=>String(a.id)===q.get('album'));if(album)year=yearOf(album)||'年未設定'}
+  if(!year&&q.get('album')){const album=albums.find(a=>String(a.id)===q.get('album'));if(album)year=albumLabel(album)}
   if(year&&groups.some(g=>g.year===year))await openYear(year,false);else home(false);
 }
 e.back.onclick=()=>history.state?.albumYear?history.back():home(true);
