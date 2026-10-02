@@ -31,7 +31,11 @@ function adapter(state){
         if(table==='photo_albums_public')rows=rows.filter(row=>row.is_published);
         rows=rows.filter(row=>filters.every(fn=>fn(row)));
         if(table==='photo_album_photos'&&state.photoGate)await state.photoGate(rows);
-        if(operation==='insert'){if(table==='photo_album_videos')state.videos.push({id:'uploaded-'+state.videos.length,created_at:'2026-10-02T00:00:00Z',...payload});return {data:null,error:null}}
+        if(operation==='insert'){
+          if(table==='photo_album_videos')state.videos.push({id:'uploaded-'+state.videos.length,created_at:'2026-10-02T00:00:00Z',...payload});
+          if(table==='photo_albums'){const album={id:'new-'+(state.albums.length+1),created_at:'2026-10-02T00:00:00Z',cover_path:null,photos:[{count:0}],photo_count:0,...payload};state.albums.push(album);return {data:structuredClone(single?album:[album]),error:null}}
+          return {data:null,error:null};
+        }
         if(operation==='update'){
           if(state.failSave)return {data:null,error:{message:'TEST: network write failed'}};
           if(state.conflict)return {data:null,error:null};
@@ -55,9 +59,10 @@ async function mount(name,state){
   w.Image=class{set src(value){state.imageRequests??=[];state.imageRequests.push(value);const loaded=()=>this.onload?.();if(state.imageGate)state.imageGate(loaded);else queueMicrotask(loaded)}};
   const client=adapter(state);w.createClient=()=>client;
   const shared=fs.readFileSync(path.join(root,'album-settings.js'),'utf8').replace(/^export /gm,'');
+  const labels=fs.readFileSync(path.join(root,'album-labels.js'),'utf8').replace(/^export /gm,'');
   const code=fs.readFileSync(path.join(root,name+'.js'),'utf8').replace(/^import.*?;[ \t]*$/gm,'');
   const expose=name==='index'?'window.testAPI={openYear,nextPage,home,startIntro,finishIntro,hideIntro,getPhotos:()=>photos};':'window.testAPI={loadPicker,removeSavedIntroPhotos,editGroup,uploadVideos};';
-  w.eval(shared+'\n'+code+'\n'+expose);
+  w.eval(shared+'\n'+labels+'\n'+code+'\n'+expose);
   return {w,doc:w.document,close:()=>w.close()};
 }
 function input(w,selector,value){const node=w.document.querySelector(selector);if(node.type==='checkbox')node.checked=value;else node.value=value;node.dispatchEvent(new w.Event('input',{bubbles:true}));node.dispatchEvent(new w.Event('change',{bubbles:true}))}
@@ -68,7 +73,7 @@ function submit(w){w.document.querySelector('#siteForm').dispatchEvent(new w.Eve
   const jsSource=fs.readFileSync(path.join(root,'admin.js'),'utf8');
   assert(!adminSource.includes('tus-js-client'),'no external TUS download required');
   assert(!jsSource.includes('new window.tus.Upload'),'video must avoid chunked TUS');
-  assert(adminSource.includes('admin.js?v=20261002-3'),'bust previously cached admin module');
+  assert(adminSource.includes('admin.js?v=20261002-4'),'bust previously cached admin module');
   // Even before the JS module downloads, the HTML must not expose the album behind it.
   const initial=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'));
   assert.equal(initial.window.getComputedStyle(initial.window.document.querySelector('main.page')).visibility,'hidden');
@@ -311,5 +316,35 @@ function submit(w){w.document.querySelector('#siteForm').dispatchEvent(new w.Eve
   app=await mount('index',state);await until(()=>app.doc.querySelectorAll('.yearCard').length===2,'round-trip public');
   assert.equal(app.doc.querySelector('#displayName').textContent,'編集後のタイトル');assert(app.doc.querySelector('#intro').classList.contains('hidden'));app.close();
   console.log('PASS: failure retains edits, concurrent-save protection, deletion preserves saved flag, public round trip');
+
+  // Album names need not contain a year. Preserve old numeric-year albums and routes.
+  const helpers=await import('data:text/javascript;charset=utf-8,'+encodeURIComponent(fs.readFileSync(path.join(root,'album-labels.js'),'utf8')));
+  assert.deepEqual(helpers.normalizeAlbumTitle(' 学生時代 '),{key:'学生時代',title:'学生時代',album_date:null});
+  assert.deepEqual(helpers.normalizeAlbumTitle('2025'),{key:'2025',title:'2025年',album_date:'2025-01-01'});
+  assert.equal(helpers.albumLabel({title:'年代不明',album_date:null}),'年代不明');
+  assert.equal(helpers.albumLabel({title:'2026年',album_date:'2026-01-01'}),'2026');
+  assert.equal(helpers.albumLabel({title:'2024年の夏',album_date:null}),'2024年の夏','do not extract embedded years from custom titles');
+  assert(helpers.compareAlbumLabels('2026','学生時代')<0,'numeric year albums retain their order');
+  state=fixture(false);app=await mount('admin',state);
+  await until(()=>app.doc.querySelectorAll('#albumList .row').length===2,'album admin ready');
+  assert.equal(app.doc.querySelector('#aYear').type,'text','free-form album title input');
+  app.doc.querySelector('#newAlbum').click();input(app.w,'#aYear','学生時代');
+  app.doc.querySelector('#albumForm').dispatchEvent(new app.w.Event('submit',{bubbles:true,cancelable:true}));
+  await until(()=>state.albums.some(a=>a.title==='学生時代'),'named album creation');
+  assert.equal(state.albums.find(a=>a.title==='学生時代').album_date,null,'custom labels have no fictitious date');
+  await app.w.testAPI.editGroup('2025');input(app.w,'#aYear','年代不明');
+  app.doc.querySelector('#albumForm').dispatchEvent(new app.w.Event('submit',{bubbles:true,cancelable:true}));
+  await until(()=>state.albums.find(a=>a.id==='a2025').title==='年代不明','existing album renamed');
+  assert.equal(state.albums.find(a=>a.id==='a2025').album_date,null,'renamed album date cleared');
+  assert(app.doc.querySelector('[data-key="年代不明"]'),'renamed album appears in admin');
+  app.close();app=await mount('index',state);
+  await until(()=>app.doc.querySelectorAll('.yearCard').length===3,'public named albums');
+  assert(app.doc.querySelector('[data-year="学生時代"] .yearNum').textContent==='学生時代');
+  assert(app.doc.querySelector('[data-year="年代不明"] .yearNum').classList.contains('customTitle'));
+  await app.w.testAPI.openYear('年代不明');
+  assert.equal(app.doc.querySelector('#detailYear').textContent,'年代不明');
+  assert.equal(new URLSearchParams(app.w.location.search).get('year'),'年代不明','custom title deep link');
+  app.close();
+  console.log('PASS: custom album creation, existing-year rename, public labels, custom deep links');
   console.log('All album regression checks passed.');
 })().catch(error=>{console.error(error);process.exitCode=1});
