@@ -29,6 +29,10 @@ button:disabled{opacity:.5;cursor:wait}.saveActions{position:sticky;bottom:0;z-i
 .colorSettings{border:1px solid var(--line);border-radius:14px;padding:15px}.colorSettings summary{font-size:14px;font-weight:800;cursor:pointer}.colors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}.form .colorField{display:flex;align-items:center;gap:8px}.colorField input[type=color]{width:44px;height:40px;padding:2px}.presetGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}.presetBtn{border:1px solid var(--line);border-radius:10px;background:#fff;padding:9px;font-size:11px;cursor:pointer}.presetBtn.active{outline:2px solid var(--gold)}.swatches{display:flex;height:10px;margin-top:6px;border-radius:99px;overflow:hidden}.swatches i{flex:1}.slotControls{position:absolute;bottom:4px;left:3px;right:3px;display:flex;justify-content:center;gap:3px}.slotControls button{border:0;border-radius:7px;background:#fffe;min-width:25px;min-height:28px;color:#302b25;font-size:14px;cursor:pointer}.top h1{font-size:clamp(21px,6vw,28px)}.top>.primary{flex-shrink:0}.rowActions{flex-wrap:wrap}.row{grid-template-columns:70px minmax(0,1fr) auto}.thumb{max-width:100%}
 @media(min-width:760px){.presetGrid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .mediaUploadActions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}.photo.videoTile{background:#222}.photo .videoTag{position:absolute;left:5px;top:5px;padding:4px 7px;border-radius:7px;background:#000b;color:#fff;font-size:11px;font-weight:800}.photo .videoFallback{display:grid;place-items:center;height:100%;font-size:27px;color:white}.photo.videoTile img{height:100%;width:100%;object-fit:cover}.photo .coverBtn:disabled{opacity:.5;cursor:not-allowed}
+/* Single-request Storage upload cannot report byte progress: animate activity. */
+.progressWrap.videoSending .progressTrack{position:relative;overflow:hidden}
+.progressWrap.videoSending .progressBar{width:100%!important;animation:albumVideoSending 1.3s ease-in-out infinite;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+@keyframes albumVideoSending{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 </style>
 </head>
 <body>
@@ -77,8 +81,8 @@ button:disabled{opacity:.5;cursor:wait}.saveActions{position:sticky;bottom:0;z-i
 <div id="progress" class="progressWrap hidden"><div class="progressTrack"><div id="progressBar" class="progressBar"></div></div><p id="progressText" class="mut"></p></div><div id="photoGrid" class="photos"></div></section>
 </main></div></section>
 <div id="toast" class="toast hidden"></div>
-<!-- Load the distributable BROWSER bundle; esm CDN package entry can resolve Node's stream reader. -->
-<script defer src="https://cdn.jsdelivr.net/npm/tus-js-client@4.3.1/dist/tus.min.js"></script>
-<script type="module" src="admin.js?v=20261002-2"></script>
+
+
+<script type="module" src="admin.js?v=20261002-3"></script>
 </body>
 </html>
