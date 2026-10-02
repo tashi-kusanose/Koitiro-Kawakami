@@ -1,6 +1,6 @@
 import {introEnabled, introPhotoMode, pageSettings, applyAppearance, DEFAULT_COLORS} from './album-settings.js?v=20260930-3';
 import{createClient}from'https://esm.sh/@supabase/supabase-js@2.117.2';
-import * as tus from 'https://esm.sh/tus-js-client@4.3.1';
+// The browser-specific TUS bundle is loaded by admin.html before this module.
 const sb=createClient('https://esfgrykcvdctnvdqipbj.supabase.co','sb_publishable_Rwb3qaRXdWZoo05LrbFaDg_29tMI7uI'),bucket='photo-album',videoBucket='photo-album-videos',maxVideoBytes=30*1024*1024,maxPhotos=1500,$=s=>document.querySelector(s);
 const e={siteEyebrow:$('#siteEyebrow'),siteHeaderText:$('#siteHeaderText'),siteIntro:$('#siteIntro'),titleFont:$('#titleFont'),titleSize:$('#titleSize'),introFinalText:$('#introFinalText'),saveSite:$('#saveSite'),saveStatus:$('#saveStatus'),adminStatus:$('#adminStatus'),cBg:$('#cBg'),cSurface:$('#cSurface'),cText:$('#cText'),cMuted:$('#cMuted'),cAccent:$('#cAccent'),cHeader:$('#cHeader'),presetGrid:$('#presetGrid'),auth:$('#auth'),admin:$('#admin'),logout:$('#logout'),logoutMobile:$('#logoutMobile'),login:$('#login'),email:$('#email'),pass:$('#password'),magic:$('#magic'),newAlbum:$('#newAlbum'),navNew:$('#navNew'),navSettings:$('#navSettings'),navAlbums:$('#navAlbums'),list:$('#albumList'),qCount:$('#qCount'),qBytes:$('#qBytes'),qVideos:$('#qVideos'),qBar:$('#qBar'),settingsToggle:$('#settingsToggle'),settingsPanel:$('#settingsPanel'),siteForm:$('#siteForm'),siteTitle:$('#siteTitle'),introEnabled:$('#introEnabled'),sitePublished:$('#sitePublished'),previewLink:$('#previewLink'),introSelected:$('#introSelected'),picker:$('#photoPicker'),pickerMore:$('#pickerMore'),pickCount:$('#pickCount'),editor:$('#editor'),editorTitle:$('#editorTitle'),close:$('#closeEditor'),form:$('#albumForm'),groupKey:$('#groupKey'),year:$('#aYear'),pub:$('#aPub'),del:$('#deleteAlbum'),upload:$('#uploadBox'),files:$('#files'),videoFiles:$('#videoFiles'),progress:$('#progress'),pBar:$('#progressBar'),pText:$('#progressText'),photos:$('#photoGrid'),toast:$('#toast')};
 let user=null,site=null,albums=[],groups=[],currentGroup=null,currentAlbum=null,albumVideoCounts=new Map(),videoUsage={count:0,bytes:0},usage={count:0,bytes:0},introSelected=[],pickerPhotos=[],pickerPage=0,pickerMore=true;
@@ -156,19 +156,40 @@ async function videoThumbnail(file){
  }finally{node.pause();node.removeAttribute('src');node.load();URL.revokeObjectURL(objectUrl)}
 }
 async function sendVideo(path,file,mime,onProgress){
- const {data:{session},error}=await sb.auth.getSession();if(error||!session?.access_token)throw new Error('ログインし直してください');
- if(file.size<=6*1024*1024){
-   const result=await sb.storage.from(videoBucket).upload(path,file,{contentType:mime,cacheControl:'3600'});
-   if(result.error)throw result.error;onProgress(1);return;
+ const {data,error}=await sb.auth.getSession();
+ if(error||!data?.session?.access_token)throw new Error('ログインし直してください');
+ // The standard Storage uploader accepts browser File / Blob, including a
+ // 30MB file within our dedicated bucket limit. It is also a fallback if
+ // the browser TUS bundle cannot be downloaded.
+ async function standardUpload(){
+  onProgress(0);
+  const result=await sb.storage.from(videoBucket).upload(path,file,{contentType:mime,cacheControl:'3600'});
+  if(result.error)throw result.error;
+  onProgress(1);
  }
- await new Promise((resolve,reject)=>{
-  const task=new tus.Upload(file,{endpoint:'https://esfgrykcvdctnvdqipbj.storage.supabase.co/storage/v1/upload/resumable',
-   retryDelays:[0,3000,5000,10000,20000],headers:{authorization:'Bearer '+session.access_token,apikey:'sb_publishable_Rwb3qaRXdWZoo05LrbFaDg_29tMI7uI'},
-   uploadDataDuringCreation:true,removeFingerprintOnSuccess:true,chunkSize:6*1024*1024,
-   metadata:{bucketName:videoBucket,objectName:path,contentType:mime,cacheControl:'3600'},
-   onError:reject,onProgress:(done,total)=>onProgress(total?done/total:0),onSuccess:resolve});
-  task.start();
- });
+ if(file.size<=6*1024*1024||typeof window.tus?.Upload!=='function'){
+  await standardUpload();return;
+ }
+ try{
+  await new Promise((resolve,reject)=>{
+   // Explicit browser UMD bundle (window.tus), never the Node ESM entry.
+   const task=new window.tus.Upload(file,{
+    endpoint:'https://esfgrykcvdctnvdqipbj.storage.supabase.co/storage/v1/upload/resumable',
+    retryDelays:[0,3000,5000,10000,20000],
+    headers:{authorization:'Bearer '+data.session.access_token,apikey:'sb_publishable_Rwb3qaRXdWZoo05LrbFaDg_29tMI7uI'},
+    uploadDataDuringCreation:true,removeFingerprintOnSuccess:true,chunkSize:6*1024*1024,
+    metadata:{bucketName:videoBucket,objectName:path,contentType:mime,cacheControl:'3600'},
+    onError:reject,onProgress:(done,total)=>onProgress(total?done/total:0),onSuccess:resolve
+   });
+   task.start();
+  });
+ }catch(err){
+  // Recover from any stale cached Node bundle without asking the user to
+  // convert their video file; other network/auth errors must remain visible.
+  if(!/source object may only be an instance of Buffer or Readable/i.test(String(err?.message||err)))throw err;
+  console.warn('Browser TUS unavailable; retrying the normal Storage uploader.',err);
+  await standardUpload();
+ }
 }
 async function uploadVideos(files){
  if(!currentAlbum||uploading)return;
