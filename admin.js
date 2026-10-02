@@ -155,41 +155,25 @@ async function videoThumbnail(file){
   return null;
  }finally{node.pause();node.removeAttribute('src');node.load();URL.revokeObjectURL(objectUrl)}
 }
+// Videos are limited to 30MB. One standard POST avoids the repeated
+// mobile-network failure of the second 6MiB TUS PATCH request.
 async function sendVideo(path,file,mime,onProgress){
+ if(!file||file.size<=0||file.size>maxVideoBytes)throw new Error('動画は1本30MBまでです');
  const {data,error}=await sb.auth.getSession();
  if(error||!data?.session?.access_token)throw new Error('ログインし直してください');
- // The standard Storage uploader accepts browser File / Blob, including a
- // 30MB file within our dedicated bucket limit. It is also a fallback if
- // the browser TUS bundle cannot be downloaded.
- async function standardUpload(){
-  onProgress(0);
-  const result=await sb.storage.from(videoBucket).upload(path,file,{contentType:mime,cacheControl:'3600'});
-  if(result.error)throw result.error;
-  onProgress(1);
+ onProgress(null);
+ const result=await sb.storage.from(videoBucket).upload(path,file,{
+  contentType:mime,cacheControl:'3600',upsert:false
+ });
+ if(result.error){
+  console.error('Album video upload failed',result.error);
+  const status=result.error.statusCode||result.error.status;
+  const message=result.error.message||'通信エラー';
+  if(/failed to fetch|network|load failed|fetch failed/i.test(message))
+   throw new Error('動画の送信中に通信が中断されました。Wi-Fi／モバイル回線を切り替えて再度お試しください。');
+  throw new Error('動画のアップロードに失敗しました'+(status?'（HTTP '+status+'）':'')+': '+message);
  }
- if(file.size<=6*1024*1024||typeof window.tus?.Upload!=='function'){
-  await standardUpload();return;
- }
- try{
-  await new Promise((resolve,reject)=>{
-   // Explicit browser UMD bundle (window.tus), never the Node ESM entry.
-   const task=new window.tus.Upload(file,{
-    endpoint:'https://esfgrykcvdctnvdqipbj.storage.supabase.co/storage/v1/upload/resumable',
-    retryDelays:[0,3000,5000,10000,20000],
-    headers:{authorization:'Bearer '+data.session.access_token,apikey:'sb_publishable_Rwb3qaRXdWZoo05LrbFaDg_29tMI7uI'},
-    uploadDataDuringCreation:true,removeFingerprintOnSuccess:true,chunkSize:6*1024*1024,
-    metadata:{bucketName:videoBucket,objectName:path,contentType:mime,cacheControl:'3600'},
-    onError:reject,onProgress:(done,total)=>onProgress(total?done/total:0),onSuccess:resolve
-   });
-   task.start();
-  });
- }catch(err){
-  // Recover from any stale cached Node bundle without asking the user to
-  // convert their video file; other network/auth errors must remain visible.
-  if(!/source object may only be an instance of Buffer or Readable/i.test(String(err?.message||err)))throw err;
-  console.warn('Browser TUS unavailable; retrying the normal Storage uploader.',err);
-  await standardUpload();
- }
+ onProgress(1);
 }
 async function uploadVideos(files){
  if(!currentAlbum||uploading)return;
@@ -207,11 +191,12 @@ async function uploadVideos(files){
    try{
     progress(0,1,'動画を準備中: '+file.name);
     let thumb=null;try{thumb=await videoThumbnail(file)}catch(error){console.warn('サムネイル生成を省略:',error)}
-    await sendVideo(videoPath,file,mime,pct=>{e.pBar.style.width=Math.round(pct*100)+'%';e.pText.textContent=(i+1)+' / '+list.length+' · '+file.name+' · '+Math.round(pct*100)+'%'});videoSaved=true;
+    await sendVideo(videoPath,file,mime,pct=>{const sending=pct===null;e.progress.classList.toggle('videoSending',sending);e.pBar.style.width=sending?'100%':Math.round(pct*100)+'%';e.pText.textContent=(i+1)+' / '+list.length+' · '+file.name+(sending?' · 送信中（完了まで画面を閉じないでください）':' · 送信完了')});e.progress.classList.remove('videoSending');videoSaved=true;
     if(thumb){const result=await sb.storage.from(bucket).upload(thumbPath,thumb,{contentType:'image/webp',cacheControl:'31536000'});if(result.error)console.warn('サムネイル保存を省略:',result.error);else thumbSaved=true}
     const result=await sb.from('photo_album_videos').insert({album_id:targetAlbum.id,owner_user_id:ownerId,video_path:videoPath,thumb_path:thumbSaved?thumbPath:null,video_bytes:file.size,thumb_bytes:thumbSaved?thumb.size:0,mime_type:mime});
     if(result.error)throw result.error;ok++;
    }catch(error){
+    e.progress.classList.remove('videoSending');
     console.error(error);toast(file.name+': '+error.message);
     if(videoSaved)await sb.storage.from(videoBucket).remove([videoPath]);
     if(thumbSaved)await sb.storage.from(bucket).remove([thumbPath]);
@@ -221,7 +206,7 @@ async function uploadVideos(files){
   await loadAlbums();
   uploading=false;const key=yearOf(targetAlbum)||currentGroup?.key;if(key&&groups.some(g=>g.key===key))await editGroup(key);
   setTimeout(()=>e.progress.classList.add('hidden'),1800);
- }catch(error){toast(error.message)}finally{uploading=false;e.videoFiles.value='';e.videoFiles.disabled=false;e.files.disabled=false}
+ }catch(error){toast(error.message)}finally{e.progress.classList.remove('videoSending');uploading=false;e.videoFiles.value='';e.videoFiles.disabled=false;e.files.disabled=false}
 }
 async function upload(files){
   if(!currentAlbum||uploading)return;

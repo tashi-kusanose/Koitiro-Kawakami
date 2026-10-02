@@ -12,12 +12,12 @@ function fixture(enabled=false){
   return {
     site:{id:'site',slug:'album-test',owner_user_id:'owner',page_title:'川上 公一朗',eyebrow_text:'アルバム',header_text:'大切な思い出',intro_text:'一行目\n二行目',is_published:true,updated_at:'version-1',theme:{intro_enabled:enabled,intro_photos:photos.slice(0,3),custom_setting:'retain-me',background:'#8cc9ff'}},
     albums:[{id:'a2026',site_id:'site',owner_user_id:'owner',album_date:'2026-01-01',title:'2026年',is_published:true,photo_count:1001,photos:[{count:1001}],cover_path:'thumbs/0.webp'},{id:'a2025',site_id:'site',owner_user_id:'owner',album_date:'2025-01-01',title:'2025年',is_published:true,photo_count:1,photos:[{count:1}],cover_path:'thumbs/1001.webp'}],
-    photos, videos:[], storageUploads:[], log:[], authCallbacks:[], delaySite:null, photoGate:null, failSave:false, conflict:false,session:{user:{id:'owner'},access_token:'test-token'}
+    photos, videos:[], storageUploads:[], storageFail:false, log:[], authCallbacks:[], delaySite:null, photoGate:null, failSave:false, conflict:false,session:{user:{id:'owner'},access_token:'test-token'}
   };
 }
 function adapter(state){
   return {
-    storage:{from:bucket=>({getPublicUrl:p=>({data:{publicUrl:'https://images.test/'+p}}),upload:async(p,file)=>{state.storageUploads.push({bucket,path:p,size:file.size});return {error:null}},remove:async()=>({error:null})})},
+    storage:{from:bucket=>({getPublicUrl:p=>({data:{publicUrl:'https://images.test/'+p}}),upload:async(p,file)=>{state.storageUploads.push({bucket,path:p,size:file.size});return {error:state.storageFail&&bucket==='photo-album-videos'?{message:'Failed to fetch',statusCode:'0'}:null}},remove:async()=>({error:null})})},
     auth:{getSession:async()=>({data:{session:state.session}}),onAuthStateChange:fn=>{state.authCallbacks.push(fn);return {data:{subscription:{unsubscribe(){}}}}},signOut:async()=>{state.session=null;state.authCallbacks.forEach(fn=>fn('SIGNED_OUT',null));return {error:null}}},
     from(table){
       const filters=[],sorts=[];let range=null,operation='select',payload=null,single=false;
@@ -63,11 +63,12 @@ async function mount(name,state){
 function input(w,selector,value){const node=w.document.querySelector(selector);if(node.type==='checkbox')node.checked=value;else node.value=value;node.dispatchEvent(new w.Event('input',{bubbles:true}));node.dispatchEvent(new w.Event('change',{bubbles:true}))}
 function submit(w){w.document.querySelector('#siteForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}))}
 (async()=>{
-  // The prebuilt browser bundle must load BEFORE the admin module.
+  // No TUS dependency or PATCH chunking on any mobile video upload.
   const adminSource=fs.readFileSync(path.join(root,'admin.html'),'utf8');
-  assert(adminSource.indexOf('/dist/tus.min.js')<adminSource.indexOf('src="admin.js?'));
   const jsSource=fs.readFileSync(path.join(root,'admin.js'),'utf8');
-  assert(!jsSource.includes("import * as tus from 'https://esm.sh/"),'never load the Node ESM build in browser');
+  assert(!adminSource.includes('tus-js-client'),'no external TUS download required');
+  assert(!jsSource.includes('new window.tus.Upload'),'video must avoid chunked TUS');
+  assert(adminSource.includes('admin.js?v=20261002-3'),'bust previously cached admin module');
   // Even before the JS module downloads, the HTML must not expose the album behind it.
   const initial=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'));
   assert.equal(initial.window.getComputedStyle(initial.window.document.querySelector('main.page')).visibility,'hidden');
@@ -244,48 +245,38 @@ function submit(w){w.document.querySelector('#siteForm').dispatchEvent(new w.Eve
   assert.equal(uploadState.videos[0].video_bytes,sample.size,'recorded video bytes must match file size');
   assert.equal(uploadState.storageUploads.filter(item=>item.bucket==='photo-album-videos').length,1,'video uses a separate bucket');
   assert(uploadApp.doc.querySelector('#qVideos').textContent.includes('1本'),'admin usage updates');
-  // Android regression: browser File (not Node Buffer/Readable) above 6MB
-  // must be sent to the explicitly loaded browser UMD TUS implementation.
-  const tusCalls=[];
-  uploadApp.w.tus={Upload:class {
-    constructor(file,options){
-      assert(file instanceof uploadApp.w.File,'TUS receives a browser File object');
-      tusCalls.push({file,options});
-      this.file=file;this.options=options;
-    }
-    start(){this.options.onProgress(this.file.size,this.file.size);this.options.onSuccess()}
-  }};
+  // Even when a TUS browser implementation is present, videos greater
+  // than 6MiB must use a single standard Storage upload, not a second PATCH.
+  uploadApp.w.tus={Upload:class{constructor(){throw new Error('TUS must never be called')}}};
   const largeFile=new uploadApp.w.File(['video bytes'],'large.mp4',{type:'video/mp4'});
   Object.defineProperty(largeFile,'size',{value:8*1024*1024});
   await uploadApp.w.testAPI.uploadVideos([largeFile]);
-  assert.equal(tusCalls.length,1,'large files use browser TUS');
-  assert.equal(tusCalls[0].options.chunkSize,6*1024*1024);
-  assert.equal(tusCalls[0].options.metadata.bucketName,'photo-album-videos');
-  assert.equal(uploadState.videos.length,2,'large video is recorded');
+  assert.equal(uploadState.videos.length,2,'large file saved');
+  assert(uploadState.storageUploads.some(v=>v.bucket==='photo-album-videos'&&v.size===8*1024*1024),'8MB uses standard POST');
 
-  // If the browser bundle was blocked by a CDN/network issue, a direct
-  // Supabase Storage upload must still accept files within the 30MB limit.
-  delete uploadApp.w.tus;
-  const fallbackFile=new uploadApp.w.File(['bytes'],'fallback.mp4',{type:'video/mp4'});
-  Object.defineProperty(fallbackFile,'size',{value:10*1024*1024});
-  await uploadApp.w.testAPI.uploadVideos([fallbackFile]);
-  assert.equal(uploadState.videos.length,3,'standard browser upload fallback succeeds');
-  assert(uploadState.storageUploads.some(item=>item.bucket==='photo-album-videos'&&item.size===10*1024*1024));
-
-  // Also recover cleanly from the exact Node implementation error reported on Android.
-  uploadApp.w.tus={Upload:class {
-    constructor(file,options){this.options=options}
-    start(){this.options.onError(new Error('source object may only be an instance of Buffer or Readable in this environment'))}
-  }};
-  const oldBugFile=new uploadApp.w.File(['bytes'],'old-error.mp4',{type:'video/mp4'});
-  Object.defineProperty(oldBugFile,'size',{value:9*1024*1024});
-  await uploadApp.w.testAPI.uploadVideos([oldBugFile]);
-  assert.equal(uploadState.videos.length,4,'known Node bundle error triggers standard uploader');
+  // Test the exact 30MB boundary and ensure >30MB is rejected beforehand.
+  const boundary=new uploadApp.w.File(['bytes'],'boundary.mp4',{type:'video/mp4'});
+  Object.defineProperty(boundary,'size',{value:30*1024*1024});
+  await uploadApp.w.testAPI.uploadVideos([boundary]);
+  assert.equal(uploadState.videos.length,3,'30MB is allowed');
+  const tooBig=new uploadApp.w.File(['bytes'],'too-big.mp4',{type:'video/mp4'});
+  Object.defineProperty(tooBig,'size',{value:30*1024*1024+1});
+  await uploadApp.w.testAPI.uploadVideos([tooBig]);
+  assert.equal(uploadState.videos.length,3,'over 30MB rejected');
+  
+  // No successful video metadata should be inserted after a failed POST.
+  uploadState.storageFail=true;
+  const networkFailure=new uploadApp.w.File(['bytes'],'network.mp4',{type:'video/mp4'});
+  Object.defineProperty(networkFailure,'size',{value:9*1024*1024});
+  await uploadApp.w.testAPI.uploadVideos([networkFailure]);
+  assert.equal(uploadState.videos.length,3,'network failure does not add a video');
+  uploadState.storageFail=false;
+  assert.equal(uploadApp.doc.querySelector('#videoFiles').disabled,false,'input re-enabled after upload error');
 
   await uploadApp.w.testAPI.uploadVideos([new uploadApp.w.File(['x'],'wrong.txt',{type:'text/plain'})]);
-  assert.equal(uploadState.videos.length,4,'unsupported uploads never insert rows');
+  assert.equal(uploadState.videos.length,3,'unsupported uploads never insert rows');
   uploadApp.close();
-  console.log('PASS: video counts, photo viewer, browser File >6MB TUS, direct fallback, Node error recovery, invalid-file rejection');
+  console.log('PASS: mixed media, single-request 8MB/30MB uploads, no TUS, network failure cleanup, size/type validation');
 
   state=fixture(true);app=await mount('index',state);
   await until(()=>!app.doc.querySelector('#intro').classList.contains('hidden'),'intro ON');
