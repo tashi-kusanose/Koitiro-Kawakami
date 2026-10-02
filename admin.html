@@ -77,6 +77,8 @@ button:disabled{opacity:.5;cursor:wait}.saveActions{position:sticky;bottom:0;z-i
 <div id="progress" class="progressWrap hidden"><div class="progressTrack"><div id="progressBar" class="progressBar"></div></div><p id="progressText" class="mut"></p></div><div id="photoGrid" class="photos"></div></section>
 </main></div></section>
 <div id="toast" class="toast hidden"></div>
-<script type="module" src="admin.js?v=20261002-1"></script>
+<!-- Load the distributable BROWSER bundle; esm CDN package entry can resolve Node's stream reader. -->
+<script defer src="https://cdn.jsdelivr.net/npm/tus-js-client@4.3.1/dist/tus.min.js"></script>
+<script type="module" src="admin.js?v=20261002-2"></script>
 </body>
 </html>
