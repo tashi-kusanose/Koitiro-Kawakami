@@ -1,5 +1,6 @@
 import {introEnabled, introPhotoMode, pageSettings, applyAppearance, DEFAULT_COLORS} from './album-settings.js?v=20260930-3';
 import{createClient}from'https://esm.sh/@supabase/supabase-js@2.117.2';
+import {albumLabel, normalizeAlbumTitle, compareAlbumLabels, UNTITLED_ALBUM} from './album-labels.js?v=20261002-4';
 // The browser-specific TUS bundle is loaded by admin.html before this module.
 const sb=createClient('https://esfgrykcvdctnvdqipbj.supabase.co','sb_publishable_Rwb3qaRXdWZoo05LrbFaDg_29tMI7uI'),bucket='photo-album',videoBucket='photo-album-videos',maxVideoBytes=30*1024*1024,maxPhotos=1500,$=s=>document.querySelector(s);
 const e={siteEyebrow:$('#siteEyebrow'),siteHeaderText:$('#siteHeaderText'),siteIntro:$('#siteIntro'),titleFont:$('#titleFont'),titleSize:$('#titleSize'),introFinalText:$('#introFinalText'),saveSite:$('#saveSite'),saveStatus:$('#saveStatus'),adminStatus:$('#adminStatus'),cBg:$('#cBg'),cSurface:$('#cSurface'),cText:$('#cText'),cMuted:$('#cMuted'),cAccent:$('#cAccent'),cHeader:$('#cHeader'),presetGrid:$('#presetGrid'),auth:$('#auth'),admin:$('#admin'),logout:$('#logout'),logoutMobile:$('#logoutMobile'),login:$('#login'),email:$('#email'),pass:$('#password'),magic:$('#magic'),newAlbum:$('#newAlbum'),navNew:$('#navNew'),navSettings:$('#navSettings'),navAlbums:$('#navAlbums'),list:$('#albumList'),qCount:$('#qCount'),qBytes:$('#qBytes'),qVideos:$('#qVideos'),qBar:$('#qBar'),settingsToggle:$('#settingsToggle'),settingsPanel:$('#settingsPanel'),siteForm:$('#siteForm'),siteTitle:$('#siteTitle'),introEnabled:$('#introEnabled'),sitePublished:$('#sitePublished'),previewLink:$('#previewLink'),introSelected:$('#introSelected'),picker:$('#photoPicker'),pickerMore:$('#pickerMore'),pickCount:$('#pickCount'),editor:$('#editor'),editorTitle:$('#editorTitle'),close:$('#closeEditor'),form:$('#albumForm'),groupKey:$('#groupKey'),year:$('#aYear'),pub:$('#aPub'),del:$('#deleteAlbum'),upload:$('#uploadBox'),files:$('#files'),videoFiles:$('#videoFiles'),progress:$('#progress'),pBar:$('#progressBar'),pText:$('#progressText'),photos:$('#photoGrid'),toast:$('#toast')};
@@ -7,8 +8,7 @@ let user=null,site=null,albums=[],groups=[],currentGroup=null,currentAlbum=null,
 let initializedUser=null,savingSite=false,settingsDirty=false,pickerLoading=false,pickerVersion=0,editorVersion=0,uploading=false;
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])),url=p=>p?sb.storage.from(bucket).getPublicUrl(p).data.publicUrl:'';
 function toast(m){e.toast.textContent=m;e.toast.classList.remove('hidden');clearTimeout(toast.t);toast.t=setTimeout(()=>e.toast.classList.add('hidden'),3400)}function bytes(n){return n<1048576?(n/1024).toFixed(n?1:0)+' KB':(n/1048576).toFixed(1)+' MB'}
-function yearOf(a){if(a.album_date&&/^\d{4}/.test(a.album_date))return a.album_date.slice(0,4);const m=String(a.title||'').match(/(?:19|20)\d{2}/);return m?m[0]:null}
-function groupAlbums(){const map=new Map();albums.forEach(a=>{const y=yearOf(a)||'年未設定';if(!map.has(y))map.set(y,{key:y,year:y,albums:[],count:0,cover:'',published:false});const g=map.get(y);g.albums.push(a);g.count+=Number(a.photos?.[0]?.count||0);g.videoCount=(g.videoCount||0)+(albumVideoCounts.get(a.id)||0);if(!g.cover&&a.cover_path)g.cover=a.cover_path;if(a.is_published)g.published=true});groups=[...map.values()].sort((a,b)=>{if(a.year==='年未設定')return 1;if(b.year==='年未設定')return-1;return Number(b.year)-Number(a.year)})}
+function groupAlbums(){const map=new Map();albums.forEach(a=>{const label=albumLabel(a);if(!map.has(label))map.set(label,{key:label,year:label,albums:[],count:0,cover:'',published:false});const g=map.get(label);g.albums.push(a);g.count+=Number(a.photos?.[0]?.count||0);g.videoCount=(g.videoCount||0)+(albumVideoCounts.get(a.id)||0);if(!g.cover&&a.cover_path)g.cover=a.cover_path;if(a.is_published)g.published=true});groups=[...map.values()].sort((a,b)=>compareAlbumLabels(a.key,b.key))}
 function authChanged(session){
   user=session?.user||null;
   e.auth.classList.toggle('hidden',!!user);e.admin.classList.toggle('hidden',!user);
@@ -96,7 +96,7 @@ async function saveSite(event){
   finally{savingSite=false;setSettingsBusy(false);e.saveSite.textContent='設定を保存'}
 }
 async function loadAlbums(){const{data,error}=await sb.from('photo_albums').select('id,title,description,album_date,is_published,cover_path,created_at,site_id,photos:photo_album_photos(count)').eq('site_id',site.id).order('album_date',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false}).order('id');if(error)return toast(error.message);albums=data||[];const videoStats=await allPhotos(()=>sb.from('photo_album_videos').select('album_id,video_bytes').eq('owner_user_id',user.id).order('id'));albumVideoCounts=new Map();videoStats.forEach(video=>albumVideoCounts.set(video.album_id,(albumVideoCounts.get(video.album_id)||0)+1));videoUsage={count:videoStats.length,bytes:videoStats.reduce((total,video)=>total+Number(video.video_bytes||0),0)};groupAlbums();renderList();await loadUsage()}
-function renderList(){e.list.innerHTML=groups.length?groups.map(g=>`<article class="row" data-key="${esc(g.key)}"><div class="thumb">${g.cover?`<img src="${esc(url(g.cover))}" alt="">`:''}</div><div><h3>${esc(g.year)} <span class="status ${g.published?'':'off'}">${g.published?'公開中':'非公開'}</span></h3><p>${g.count}枚 · 動画${g.videoCount||0}本 · ${g.albums.length}データ</p></div><div class="rowActions"><button class="outline editRow" type="button">編集</button><button class="danger deleteRow" type="button">削除</button></div></article>`).join(''):'<div class="empty">年別アルバムはまだありません。</div>';e.list.querySelectorAll('.editRow').forEach(b=>b.onclick=ev=>{ev.stopPropagation();editGroup(b.closest('.row').dataset.key)});e.list.querySelectorAll('.deleteRow').forEach(b=>b.onclick=ev=>{ev.stopPropagation();removeGroup(b.closest('.row').dataset.key)});e.list.querySelectorAll('.row').forEach(x=>x.onclick=()=>editGroup(x.dataset.key))}
+function renderList(){e.list.innerHTML=groups.length?groups.map(g=>`<article class="row" data-key="${esc(g.key)}"><div class="thumb">${g.cover?`<img src="${esc(url(g.cover))}" alt="">`:''}</div><div><h3>${esc(g.year)} <span class="status ${g.published?'':'off'}">${g.published?'公開中':'非公開'}</span></h3><p>${g.count}枚 · 動画${g.videoCount||0}本 · ${g.albums.length}データ</p></div><div class="rowActions"><button class="outline editRow" type="button">編集</button><button class="danger deleteRow" type="button">削除</button></div></article>`).join('') :'<div class="empty">アルバムはまだありません。</div>';e.list.querySelectorAll('.editRow').forEach(b=>b.onclick=ev=>{ev.stopPropagation();editGroup(b.closest('.row').dataset.key)});e.list.querySelectorAll('.deleteRow').forEach(b=>b.onclick=ev=>{ev.stopPropagation();removeGroup(b.closest('.row').dataset.key)});e.list.querySelectorAll('.row').forEach(x=>x.onclick=()=>editGroup(x.dataset.key))}
 async function allPhotos(makeQuery){
   const collected=[],size=500;
   for(let offset=0;;offset+=size){const {data,error}=await makeQuery().range(offset,offset+size-1);if(error)throw error;collected.push(...(data||[]));if((data||[]).length<size)return collected}
@@ -106,9 +106,27 @@ async function loadUsage(){
   usage={count:data.length,bytes:data.reduce((sum,photo)=>sum+(photo.image_bytes||0)+(photo.thumb_bytes||0),0)};
   e.qCount.textContent=usage.count+' / '+maxPhotos+'枚';e.qBytes.textContent='推定 '+bytes(usage.bytes)+' / 1 GB';e.qBar.style.width=Math.min(100,Math.round(usage.count/maxPhotos*100))+'%';e.qVideos.textContent='動画 '+videoUsage.count+'本 / '+bytes(videoUsage.bytes)+'（1本30MBまで）';
 }
-function fresh(){if(uploading)return toast('写真のアップロード完了をお待ちください');if(!site)return;editorVersion++;currentGroup=null;currentAlbum=null;e.form.reset();e.groupKey.value='';e.year.value=new Date().getFullYear();e.pub.checked=true;e.del.classList.add('hidden');e.upload.classList.add('hidden');e.photos.innerHTML='';e.editorTitle.textContent='新しい年を追加';e.editor.classList.remove('hidden');e.editor.scrollIntoView({behavior:'smooth'})}
-async function editGroup(key){if(uploading)return toast('写真のアップロード完了をお待ちください');currentGroup=groups.find(g=>g.key===key);if(!currentGroup)return;currentAlbum=currentGroup.albums[0];e.groupKey.value=key;e.year.value=currentGroup.year==='年未設定'?'':currentGroup.year;e.pub.checked=currentGroup.published;e.del.classList.remove('hidden');e.upload.classList.remove('hidden');e.editorTitle.textContent=currentGroup.year+'年の写真';e.editor.classList.remove('hidden');await loadPhotos();e.editor.scrollIntoView({behavior:'smooth'})}
-async function saveGroup(ev){ev.preventDefault();if(uploading||!site)return;const year=String(e.year.value).trim();if(!/^(19|20)\d{2}$/.test(year))return toast('4桁の年を入力してください');if(!currentGroup){const r=await sb.from('photo_albums').insert({title:year+'年',album_date:year+'-01-01',is_published:e.pub.checked,owner_user_id:user.id,site_id:site.id,description:''}).select().single();if(r.error)return toast(r.error.message);toast(year+'年を追加しました');await loadAlbums();await editGroup(year);return}const ids=currentGroup.albums.map(a=>a.id);const r=await sb.from('photo_albums').update({title:year+'年',album_date:year+'-01-01',is_published:e.pub.checked}).in('id',ids).eq('owner_user_id',user.id);if(r.error)return toast(r.error.message);toast('保存しました');await loadAlbums();await editGroup(year)}
+function fresh(){if(uploading)return toast('写真のアップロード完了をお待ちください');if(!site)return;editorVersion++;currentGroup=null;currentAlbum=null;e.form.reset();e.groupKey.value='';e.year.value='';e.pub.checked=true;e.del.classList.add('hidden');e.upload.classList.add('hidden');e.photos.innerHTML='';e.editorTitle.textContent='新しいアルバムを追加';e.editor.classList.remove('hidden');e.editor.scrollIntoView({behavior:'smooth'})}
+async function editGroup(key){if(uploading)return toast('写真のアップロード完了をお待ちください');currentGroup=groups.find(g=>g.key===key);if(!currentGroup)return;currentAlbum=currentGroup.albums[0];e.groupKey.value=key;e.year.value=currentGroup.year===UNTITLED_ALBUM?'':currentGroup.year;e.pub.checked=currentGroup.published;e.del.classList.remove('hidden');e.upload.classList.remove('hidden');e.editorTitle.textContent=currentGroup.year+'｜写真・動画';e.editor.classList.remove('hidden');await loadPhotos();e.editor.scrollIntoView({behavior:'smooth'})}
+async function saveGroup(ev){
+  ev.preventDefault();if(uploading||!site)return;
+  const input=String(e.year.value).trim();
+  if(!input)return toast('アルバムタイトルを入力してください');
+  if(input.length>80)return toast('アルバムタイトルは80文字以内で入力してください');
+  const {key,title,album_date}=normalizeAlbumTitle(input);
+  if(key===UNTITLED_ALBUM)return toast('別のアルバムタイトルを入力してください');
+  if(groups.some(group=>group.key===key&&group.key!==currentGroup?.key))return toast('同じタイトルのアルバムが既にあります');
+  const payload={title,album_date,is_published:e.pub.checked};
+  if(!currentGroup){
+    const r=await sb.from('photo_albums').insert({...payload,owner_user_id:user.id,site_id:site.id,description:''}).select().single();
+    if(r.error)return toast(r.error.message);
+    toast('アルバムを追加しました');await loadAlbums();await editGroup(key);return;
+  }
+  const ids=currentGroup.albums.map(a=>a.id);
+  const r=await sb.from('photo_albums').update(payload).in('id',ids).eq('owner_user_id',user.id);
+  if(r.error)return toast(r.error.message);
+  toast('保存しました');await loadAlbums();await editGroup(key);
+}
 async function loadPhotos(){
   if(!currentGroup)return;const version=++editorVersion,ids=currentGroup.albums.map(album=>album.id),cover=currentGroup.cover;
   e.photos.innerHTML='<p class="mut">写真・動画を読み込んでいます…</p>';
@@ -119,7 +137,7 @@ async function loadPhotos(){
     e.photos.querySelectorAll('.deletePhoto:not(.deleteVideo)').forEach(button=>button.onclick=()=>removePhoto(button));e.photos.querySelectorAll('.deleteVideo').forEach(button=>button.onclick=()=>removeVideo(button));e.photos.querySelectorAll('.coverBtn').forEach(button=>button.onclick=()=>setCover(button.dataset.cover));
   }catch(error){if(version===editorVersion){e.photos.innerHTML='<p class="mut">写真を読み込めませんでした。もう一度「編集」を押してください。</p>';toast(error.message)}}
 }
-async function setCover(thumbPath){if(!currentGroup)return;const primary=currentGroup.albums[0];const r=await sb.from('photo_albums').update({cover_path:thumbPath}).in('id',currentGroup.albums.map(album=>album.id)).eq('owner_user_id',user.id);if(r.error)return toast(r.error.message);toast('年の表紙を変更しました');await loadAlbums();await editGroup(yearOf({...primary,album_date:e.year.value+'-01-01'})||currentGroup.key)}
+async function setCover(thumbPath){if(!currentGroup)return;const key=currentGroup.key;const r=await sb.from('photo_albums').update({cover_path:thumbPath}).in('id',currentGroup.albums.map(album=>album.id)).eq('owner_user_id',user.id);if(r.error)return toast(r.error.message);toast('アルバムの表紙を変更しました');await loadAlbums();await editGroup(key)}
 async function removeVideo(button){
  if(uploading||savingSite)return;
  if(!confirm('この動画を削除しますか？'))return;
@@ -204,7 +222,7 @@ async function uploadVideos(files){
   }
   progress(list.length,list.length,ok+'本の動画を保存しました');
   await loadAlbums();
-  uploading=false;const key=yearOf(targetAlbum)||currentGroup?.key;if(key&&groups.some(g=>g.key===key))await editGroup(key);
+  uploading=false;const key=albumLabel(targetAlbum)||currentGroup?.key;if(key&&groups.some(g=>g.key===key))await editGroup(key);
   setTimeout(()=>e.progress.classList.add('hidden'),1800);
  }catch(error){toast(error.message)}finally{e.progress.classList.remove('videoSending');uploading=false;e.videoFiles.value='';e.videoFiles.disabled=false;e.files.disabled=false}
 }
@@ -218,7 +236,7 @@ async function upload(files){
     let position=(lastResult.data?.position??-1)+1,ok=0;
     for(let i=0;i<use.length;i++){progress(i,use.length,'変換中: '+use[i].name);try{await uploadOne(use[i],position++,targetAlbum.id,ownerId);ok++}catch(error){console.error(error);toast(use[i].name+': '+error.message)}}
     progress(use.length,use.length,ok+'枚完了');await loadAlbums();await loadPicker(true);
-    uploading=false;const key=yearOf(targetAlbum)||currentGroup?.key;if(key&&groups.some(group=>group.key===key))await editGroup(key);
+    uploading=false;const key=albumLabel(targetAlbum)||currentGroup?.key;if(key&&groups.some(group=>group.key===key))await editGroup(key);
     setTimeout(()=>e.progress.classList.add('hidden'),1800);
   }catch(error){toast(error.message)}finally{uploading=false;e.files.value='';e.files.disabled=false}
 }
