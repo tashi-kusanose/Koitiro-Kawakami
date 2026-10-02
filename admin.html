@@ -36,13 +36,13 @@ button:disabled{opacity:.5;cursor:wait}.saveActions{position:sticky;bottom:0;z-i
 </style>
 </head>
 <body>
-<section id="auth" class="authPage hidden"><div class="auth"><div class="lock">♙</div><h2>管理者ログイン</h2><p class="mut">年別アルバムとイントロ写真を管理します。</p><form id="login" class="form"><label>メールアドレス<input id="email" type="email" autocomplete="email" required></label><label>パスワード<input id="password" type="password" autocomplete="current-password" required></label><button class="primary">ログイン</button><div class="mut" style="text-align:center">または</div><button id="magic" class="magic" type="button">メールでログインリンクを送信</button></form><a data-public-link href="index.html" class="previewLink">← アルバムに戻る</a></div></section>
+<section id="auth" class="authPage hidden"><div class="auth"><div class="lock">♙</div><h2>管理者ログイン</h2><p class="mut">アルバムとイントロ写真を管理します。</p><form id="login" class="form"><label>メールアドレス<input id="email" type="email" autocomplete="email" required></label><label>パスワード<input id="password" type="password" autocomplete="current-password" required></label><button class="primary">ログイン</button><div class="mut" style="text-align:center">または</div><button id="magic" class="magic" type="button">メールでログインリンクを送信</button></form><a data-public-link href="index.html" class="previewLink">← アルバムに戻る</a></div></section>
 <section id="admin" class="hidden">
 <header class="mobileHead"><a class="link" data-public-link href="index.html">← アルバム</a><div class="mobileBrand"><small>OWNER ONLY</small><strong>ALBUM ADMIN</strong></div><button id="logoutMobile" class="ghost">ログアウト</button></header>
 <div class="app">
-<aside class="side"><div class="sideBrand"><strong id="sideTitle">川上 公一郎</strong><small>アルバム管理</small></div><nav class="sideNav"><button id="navAlbums" class="active">▣ 年別アルバム</button><button id="navNew">⊕ 年を追加</button><button id="navSettings">⚙ ページ・イントロ設定</button><a data-public-link href="index.html">↗ 公開ページ</a></nav><div class="sideBottom sideNav"><button id="logout">↪ ログアウト</button></div></aside>
+<aside class="side"><div class="sideBrand"><strong id="sideTitle">川上 公一郎</strong><small>アルバム管理</small></div><nav class="sideNav"><button id="navAlbums" class="active">▣ アルバム一覧</button><button id="navNew">⊕ アルバムを追加</button><button id="navSettings">⚙ ページ・イントロ設定</button><a data-public-link href="index.html">↗ 公開ページ</a></nav><div class="sideBottom sideNav"><button id="logout">↪ ログアウト</button></div></aside>
 <main class="main">
-<div class="top"><div><h1>年別アルバム</h1><p>これまでの写真はそのまま。年ごとにまとめて管理します。</p></div><button id="newAlbum" class="primary">＋ 年を追加</button></div>
+<div class="top"><div><h1>アルバム一覧</h1><p>年号のほか、年代不明・学生時代など自由なタイトルで管理できます。</p></div><button id="newAlbum" class="primary">＋ アルバムを追加</button></div>
 
 <section class="settingsWrap"><button id="settingsToggle" class="settingsToggle" type="button" aria-expanded="false" aria-controls="settingsPanel"><span><small>PAGE SETTINGS</small><strong>ページ・イントロ設定を開く</strong></span><span class="settingsChevron">⌄</span></button>
 <div id="settingsPanel" class="card settings hidden"><h2>ページ・イントロ設定</h2><p class="mut">ヘッダーの文字や配色、イントロの表示と写真を編集できます。変更後は「設定を保存」を押してください。</p>
@@ -75,14 +75,14 @@ button:disabled{opacity:.5;cursor:wait}.saveActions{position:sticky;bottom:0;z-i
 <div class="quota"><div class="quotaTop"><div><small class="mut">STORAGE GUIDE</small><br><strong id="qCount">0 / 1500枚</strong><span id="qVideos" class="mut" style="display:block;margin-top:5px">動画 0本 / 0 MB（1本30MBまで）</span></div><span id="qBytes" class="mut">推定 0 MB</span></div><div class="track"><div id="qBar" class="bar"></div></div><p class="mut">既存画像・保存先は変更しません。元画像とEXIF/GPSは保存しない現在の仕様を維持します。</p></div>
 <p id="adminStatus" class="mut" role="status"></p><div id="albumList" class="list"></div>
 
-<section id="editor" class="card editor hidden"><div class="editorHead"><div><small class="mut">EDIT YEAR</small><h2 id="editorTitle">年別アルバム編集</h2></div><button id="closeEditor" class="outline">閉じる</button></div>
-<form id="albumForm" class="form gridForm"><input id="groupKey" type="hidden"><label>年<input id="aYear" type="number" min="1900" max="2100" step="1" required placeholder="2026"></label><label class="switch"><input id="aPub" type="checkbox" checked><span>公開ページに表示する</span></label><div class="actions span2"><button class="primary">保存</button><button id="deleteAlbum" class="danger hidden" type="button">この年を削除</button></div></form>
-<div id="uploadBox" class="uploadBox hidden"><strong>この年に写真・動画を追加</strong><p class="mut">ここへ写真・動画をドラッグ＆ドロップ、または端末からまとめて選択できます。</p><div class="mediaUploadActions"><label class="upload">写真を選択<input id="files" type="file" accept="image/*" multiple></label><label class="upload">動画を選択<input id="videoFiles" type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" multiple></label></div><p class="mut">動画は1本30MBまで。MP4（H.264）推奨。MOVは閲覧端末によって再生できない場合があります。</p></div>
+<section id="editor" class="card editor hidden"><div class="editorHead"><div><small class="mut">EDIT ALBUM</small><h2 id="editorTitle">アルバム編集</h2></div><button id="closeEditor" class="outline">閉じる</button></div>
+<form id="albumForm" class="form gridForm"><input id="groupKey" type="hidden"><label>アルバムタイトル<input id="aYear" type="text" maxlength="80" required placeholder="例：2026／年代不明／学生時代"><span class="mut">年号が不明なら、自由な名前を付けられます。</span></label><label class="switch"><input id="aPub" type="checkbox" checked><span>公開ページに表示する</span></label><div class="actions span2"><button class="primary">保存</button><button id="deleteAlbum" class="danger hidden" type="button">このアルバムを削除</button></div></form>
+<div id="uploadBox" class="uploadBox hidden"><strong>このアルバムに写真・動画を追加</strong><p class="mut">ここへ写真・動画をドラッグ＆ドロップ、または端末からまとめて選択できます。</p><div class="mediaUploadActions"><label class="upload">写真を選択<input id="files" type="file" accept="image/*" multiple></label><label class="upload">動画を選択<input id="videoFiles" type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" multiple></label></div><p class="mut">動画は1本30MBまで。MP4（H.264）推奨。MOVは閲覧端末によって再生できない場合があります。</p></div>
 <div id="progress" class="progressWrap hidden"><div class="progressTrack"><div id="progressBar" class="progressBar"></div></div><p id="progressText" class="mut"></p></div><div id="photoGrid" class="photos"></div></section>
 </main></div></section>
 <div id="toast" class="toast hidden"></div>
 
 
-<script type="module" src="admin.js?v=20261002-3"></script>
+<script type="module" src="admin.js?v=20261002-4"></script>
 </body>
 </html>
